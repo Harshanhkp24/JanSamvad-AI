@@ -1,333 +1,327 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
-import api from '../services/api'
-import { 
-  Building2, 
-  CheckCircle2, 
-  Clock, 
-  AlertTriangle, 
-  TrendingUp, 
-  ShieldCheck, 
-  ArrowRight, 
+import { useJanSamvad } from '../context/JanSamvadContext'
+import PostCard from '../components/PostCard'
+import CivicMap from '../components/CivicMap'
+import CreatePostModal from '../components/CreatePostModal'
+import ChallengeModal from '../components/ChallengeModal'
+import GovResponseModal from '../components/GovResponseModal'
+import { FeedPost } from '../types'
+import {
+  Radio,
   Sparkles,
-  BarChart3,
-  Layers,
-  Search
+  Landmark,
+  PlusCircle,
+  FolderKanban,
+  MessageSquareCheck,
+  ShieldAlert,
+  ArrowRight,
+  TrendingUp,
+  Building,
+  CheckCircle2,
+  Users,
+  MapPin,
+  Filter,
+  ShieldCheck,
+  Send,
+  Lock
 } from 'lucide-react'
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  ResponsiveContainer, 
-  PieChart, 
-  Pie, 
-  Cell, 
-  Legend 
-} from 'recharts'
 
 export default function Home() {
-  const [complaintStats, setComplaintStats] = useState<any>(null)
-  const [departments, setDepartments] = useState<any[]>([])
-  const [recentProjects, setRecentProjects] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const { currentUser, currentDistrict, currentDistrictId } = useJanSamvad()
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [statsRes, deptRes, projRes] = await Promise.allSettled([
-          api.get('/api/complaints/stats'),
-          api.get('/api/departments'),
-          api.get('/api/projects?pageSize=4')
-        ])
+  const [activeFilter, setActiveFilter] = useState<
+    'All' | 'Project Update' | 'Development Milestone' | 'Emergency/Public Notice' | 'Public Announcement'
+  >('All')
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [challengingPost, setChallengingPost] = useState<FeedPost | null>(null)
+  const [clarifyingPost, setClarifyingPost] = useState<FeedPost | null>(null)
 
-        if (statsRes.status === 'fulfilled' && statsRes.value.data?.data) {
-          setComplaintStats(statsRes.value.data.data)
-        }
-        if (deptRes.status === 'fulfilled' && deptRes.value.data?.data) {
-          setDepartments(deptRes.value.data.data)
-        }
-        if (projRes.status === 'fulfilled' && projRes.value.data?.data?.items) {
-          setRecentProjects(projRes.value.data.data.items)
-        }
-      } catch (err) {
-        console.error('Error fetching dashboard summary', err)
-      } finally {
-        setLoading(false)
-      }
-    }
+  const rep = currentDistrict.representative
+  const opp = currentDistrict.opposition
+  const posts = currentDistrict.posts.filter(p => {
+    if (activeFilter === 'All') return true
+    return p.postType === activeFilter
+  })
 
-    fetchData()
-  }, [])
+  const totalSanctioned = currentDistrict.projects
+    .reduce((acc, p) => acc + p.budgetCr, 0)
+    .toFixed(1)
+  const activeProjectsCount = currentDistrict.projects.filter(p => p.status === 'Ongoing').length
 
-  // Chart data for Department Budgets
-  const departmentChartData = departments.slice(0, 6).map(d => ({
-    name: d.name.replace('& Infrastructure', '').trim(),
-    Budget: Math.round((d.totalBudget || 0) / 10000000), // in Crores
-    Projects: d.projectCount
-  }))
-
-  // Chart data for Complaint Status
-  const statusPieData = complaintStats ? [
-    { name: 'Resolved', value: complaintStats.resolvedComplaints || 0, color: '#10B981' },
-    { name: 'In Progress', value: complaintStats.inProgressComplaints || 0, color: '#3B82F6' },
-    { name: 'Open', value: complaintStats.openComplaints || 0, color: '#F59E0B' },
-    { name: 'Rejected', value: complaintStats.rejectedComplaints || 0, color: '#EF4444' },
-  ].filter(item => item.value > 0) : []
-
-  const formatCurrencyCr = (num: number) => {
-    const cr = num / 10000000
-    return `₹${cr.toFixed(1)} Cr`
-  }
-
-  const totalSanctionedSum = departments.reduce((acc, d) => acc + (d.totalBudget || 0), 0)
+  const isCitizen = currentUser?.role === 'citizen'
+  const citizen = isCitizen ? (currentUser as any) : null
 
   return (
-    <div className="space-y-8 pb-12">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white p-8 md:p-12 shadow-xl border border-slate-800">
-        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="relative z-10 max-w-3xl space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-semibold backdrop-blur-md">
-            <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-            <span>District Civic Intelligence Platform</span>
+    <div className="space-y-6 pb-16">
+      
+      {/* 1. District Representative Header Banner */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white p-6 md:p-8 shadow-xl border border-slate-800">
+        <div className="absolute top-0 right-0 -mt-10 -mr-10 w-72 h-72 bg-blue-500/15 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-start sm:items-center gap-4">
+            <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl overflow-hidden border-2 border-blue-400/50 shadow-md flex-shrink-0 bg-slate-800">
+              <img
+                src={rep.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'}
+                alt={rep.name}
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-[11px] font-extrabold uppercase tracking-wider">
+                <Landmark className="w-3.5 h-3.5" />
+                <span>{currentDistrict.name} District Representative</span>
+              </div>
+              <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">
+                {rep.name}
+              </h1>
+              <div className="text-xs text-blue-200 font-medium">
+                {rep.partyName} &bull; 📍 {currentDistrict.name}, {currentDistrict.state}
+              </div>
+              <p className="text-xs text-slate-300 max-w-xl line-clamp-2 pt-0.5">
+                {rep.bio}
+              </p>
+            </div>
           </div>
-          <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-white leading-tight">
-            Transparent Governance. <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-sky-300 to-indigo-300">
-              AI-Powered Civic Redressal.
+
+          {/* Quick District Metrics */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 bg-white/5 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 text-center">
+            <div className="p-2 rounded-xl bg-white/5">
+              <div className="text-lg font-black text-white">{activeProjectsCount}</div>
+              <div className="text-[10px] text-blue-300 uppercase tracking-wider font-bold">Active Projects</div>
+            </div>
+            <div className="p-2 rounded-xl bg-white/5">
+              <div className="text-lg font-black text-emerald-400">₹{totalSanctioned} Cr</div>
+              <div className="text-[10px] text-slate-300 uppercase tracking-wider font-bold">Sanctioned Funds</div>
+            </div>
+            <div className="p-2 rounded-xl bg-white/5 col-span-2 sm:col-span-1">
+              <div className="text-lg font-black text-sky-400">{currentDistrict.grievances.length}</div>
+              <div className="text-[10px] text-slate-300 uppercase tracking-wider font-bold">Grievances</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Main Two-Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Left 2 Columns: Feed Stream */}
+        <div className="lg:col-span-2 space-y-4">
+          
+          {/* Representative Post Trigger (When logged in as Representative or Admin) */}
+          {(currentUser?.role === 'representative' || currentUser?.role === 'admin') && (
+            <div className="bg-white p-4 rounded-3xl border border-blue-200 shadow-sm flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold">
+                  <Landmark className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-xs font-black text-slate-900">Publish District Communication</div>
+                  <div className="text-[11px] text-slate-500">Post development progress or official notice to {currentDistrict.name}</div>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>Create Update</span>
+              </button>
+            </div>
+          )}
+
+          {/* Filter Pills Bar */}
+          <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between gap-2 overflow-x-auto">
+            <div className="flex items-center gap-1 text-xs">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 flex items-center gap-1">
+                <Filter className="w-3 h-3" /> Filters:
+              </span>
+              {(['All', 'Project Update', 'Development Milestone', 'Emergency/Public Notice', 'Public Announcement'] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveFilter(tab)}
+                  className={`px-3 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                    activeFilter === tab
+                      ? 'bg-blue-600 text-white shadow-2xs font-bold'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+            <span className="text-[11px] text-slate-400 font-medium pr-2 hidden sm:inline">
+              {posts.length} Updates
             </span>
-          </h1>
-          <p className="text-slate-300 text-sm md:text-base leading-relaxed max-w-2xl">
-            Monitor public expenditure across wards, audit contractor disbursements, and file grievances with automated NLP categorization.
-          </p>
-          <div className="flex flex-wrap items-center gap-3 pt-2">
+          </div>
+
+          {/* Feed Post List */}
+          {posts.length === 0 ? (
+            <div className="bg-white p-12 text-center rounded-3xl border border-slate-200 text-slate-400 space-y-2">
+              <Radio className="w-8 h-8 mx-auto text-slate-300" />
+              <div className="text-sm font-bold text-slate-700">No updates matching this filter</div>
+              <div className="text-xs">Select "All" to view all representative communications.</div>
+            </div>
+          ) : (
+            posts.map(post => (
+              <PostCard
+                key={post.id}
+                post={post}
+                onChallengeClick={p => setChallengingPost(p)}
+                onGovResponseClick={p => setClarifyingPost(p)}
+              />
+            ))
+          )}
+        </div>
+
+        {/* Right 1 Column: District Intelligence Sidebar */}
+        <div className="space-y-5">
+          
+          {/* A. Verified Citizen Profile Card */}
+          <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                Verified Civic Session
+              </span>
+              <span className="text-[10px] text-slate-400 font-bold">Simulated Gov ID</span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-slate-900 to-blue-900 text-white flex items-center justify-center font-black text-sm shadow-xs">
+                {currentUser?.name.charAt(0) || 'C'}
+              </div>
+              <div className="min-w-0">
+                <div className="font-extrabold text-slate-900 text-sm truncate">
+                  {currentUser?.name || 'Rahul Sharma'}
+                </div>
+                <div className="text-xs text-slate-500 font-mono flex items-center gap-1">
+                  <Lock className="w-3 h-3 text-emerald-600" />
+                  {citizen?.maskedGovId || '********021'} &bull; PIN: {citizen?.pinCode || (currentDistrict.id === 'faridabad' ? '121001' : '122001')}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-[11px] text-slate-600 space-y-1">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Assigned District:</span>
+                <strong className="text-slate-800">{currentDistrict.name}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Assigned Rep:</span>
+                <strong className="text-blue-700">{currentDistrict.representative.name}</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* B. Mini Civic Map */}
+          <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-rose-500" />
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                  {currentDistrict.name} Project Map
+                </h3>
+              </div>
+              <Link
+                to="/projects"
+                className="text-[11px] font-bold text-blue-600 hover:underline flex items-center gap-0.5"
+              >
+                Full Map &rarr;
+              </Link>
+            </div>
+            
+            <CivicMap
+              projects={currentDistrict.projects}
+              districtId={currentDistrictId}
+              height="200px"
+              zoom={11}
+              interactive={true}
+            />
+
+            <div className="text-[11px] text-slate-500 text-center font-medium">
+              Click any pin to inspect budget, department officer, and progress.
+            </div>
+          </div>
+
+          {/* C. Opposition Scrutiny Callout */}
+          <div className="bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent p-5 rounded-3xl border border-amber-200 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-amber-800">
+                <ShieldAlert className="w-4 h-4 text-amber-600" />
+                <span>Opposition Scrutiny</span>
+              </div>
+              <span className="text-[10px] font-bold bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-full">
+                {currentDistrict.oppositionQuestions.length} Questions
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-600 text-white flex items-center justify-center font-bold text-sm shadow-xs overflow-hidden">
+                <img
+                  src={opp.avatar || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80'}
+                  alt={opp.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div>
+                <div className="font-extrabold text-slate-900 text-xs">
+                  {opp.name}
+                </div>
+                <div className="text-[11px] text-amber-800 font-semibold">
+                  {opp.title} &bull; {opp.partyName}
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-amber-950 leading-relaxed">
+              Auditing project timelines, budget variances, and resident grievances across {currentDistrict.name}.
+            </p>
+
+            <Link
+              to="/scrutiny"
+              className="inline-flex items-center justify-between w-full px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition"
+            >
+              <span>View Public Scrutiny Dashboard</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          {/* D. Quick Grievance CTA */}
+          <div className="bg-gradient-to-tr from-blue-600 to-indigo-700 text-white p-5 rounded-3xl shadow-md space-y-3">
+            <div className="flex items-center gap-2">
+              <MessageSquareCheck className="w-5 h-5" />
+              <h3 className="font-bold text-sm">Have an unresolved civic issue?</h3>
+            </div>
+            <p className="text-xs text-blue-100 leading-relaxed">
+              Submit a geo-tagged grievance linked to a project or local ward for automated departmental escalation.
+            </p>
             <Link
               to="/complaints/new"
-              className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-5 py-3 rounded-xl text-sm shadow-md transition flex items-center gap-2"
+              className="inline-flex items-center justify-center w-full px-4 py-2.5 rounded-xl bg-white hover:bg-blue-50 text-blue-800 text-xs font-extrabold shadow-sm transition"
             >
-              <span>File a Grievance</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link
-              to="/projects"
-              className="bg-white/10 hover:bg-white/15 text-white border border-white/20 font-semibold px-5 py-3 rounded-xl text-sm transition flex items-center gap-2 backdrop-blur-md"
-            >
-              <Search className="w-4 h-4 text-blue-300" />
-              <span>Explore Public Projects</span>
+              Report District Grievance &rarr;
             </Link>
           </div>
         </div>
       </div>
 
-      {/* KPI Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Public Projects</span>
-            <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
-              <Building2 className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="text-3xl font-extrabold text-slate-900">
-            {departments.reduce((acc, d) => acc + d.projectCount, 0) || 50}
-          </div>
-          <div className="text-xs text-slate-500 mt-2 flex items-center gap-1.5">
-            <span className="text-emerald-600 font-semibold flex items-center">Active monitoring</span> across 9 wards
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Total Fund Allocation</span>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="text-3xl font-extrabold text-slate-900">
-            {totalSanctionedSum > 0 ? formatCurrencyCr(totalSanctionedSum) : '₹124.5 Cr'}
-          </div>
-          <div className="text-xs text-slate-500 mt-2 flex items-center gap-1.5">
-            <span className="text-emerald-600 font-semibold">100% auditable</span> public disbursement ledger
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Resolution Rate</span>
-            <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
-              <CheckCircle2 className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="text-3xl font-extrabold text-slate-900">
-            {complaintStats ? `${complaintStats.resolutionRatePercentage}%` : '34.8%'}
-          </div>
-          <div className="text-xs text-slate-500 mt-2">
-            {complaintStats?.resolvedComplaints?.toLocaleString() || '1,050'} grievances resolved
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Active Grievances</span>
-            <div className="p-2 rounded-xl bg-amber-50 text-amber-600">
-              <Clock className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="text-3xl font-extrabold text-slate-900">
-            {complaintStats ? (complaintStats.openComplaints + complaintStats.inProgressComplaints).toLocaleString() : '1,950'}
-          </div>
-          <div className="text-xs text-amber-600 font-semibold mt-2 flex items-center gap-1">
-            <AlertTriangle className="w-3.5 h-3.5" />
-            {complaintStats?.highPriorityComplaints || 450} high/critical priority
-          </div>
-        </div>
-      </div>
-
-      {/* Interactive Visualizations Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Department Budget Bar Chart */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-blue-600" />
-                Department Budget Allocation (₹ Crores)
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">Top municipal departments by sanctioned expenditure</p>
-            </div>
-            <Link to="/projects" className="text-xs font-semibold text-blue-600 hover:underline">
-              View All
-            </Link>
-          </div>
-
-          <div className="h-72 w-full">
-            {departmentChartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={departmentChartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip 
-                    formatter={(value: any) => [`₹${value} Cr`, 'Allocated Budget']}
-                    contentStyle={{ backgroundColor: '#1E293B', color: '#fff', borderRadius: '12px', border: 'none', fontSize: '12px' }}
-                  />
-                  <Bar dataKey="Budget" fill="#3B82F6" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex items-center justify-center text-slate-400 text-sm">
-                Loading visual data...
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Complaint Status Donut Chart */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Layers className="w-4 h-4 text-indigo-600" />
-                Grievance Status Breakdown
-              </h2>
-            </div>
-            <p className="text-xs text-slate-500 mb-4">Total: {complaintStats?.totalComplaints?.toLocaleString() || '3,000'} complaints</p>
-            
-            <div className="h-56 w-full">
-              {statusPieData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={statusPieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={80}
-                      paddingAngle={4}
-                      dataKey="value"
-                    >
-                      {statusPieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#1E293B', color: '#fff', borderRadius: '12px', border: 'none', fontSize: '12px' }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: '11px' }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-slate-400 text-sm">
-                  Loading status distribution...
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500">AI categorization accuracy</span>
-            <span className="font-bold text-emerald-600">~91% Match</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Featured Projects & Fast Actions */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">Recent Public Infrastructure Projects</h2>
-            <p className="text-xs text-slate-500">Real-time progress and milestone updates across wards</p>
-          </div>
-          <Link to="/projects" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">
-            <span>Explore All 50 Projects</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {recentProjects.map(p => (
-            <Link
-              key={p.id}
-              to={`/projects/${p.id}`}
-              className="p-4 rounded-xl border border-slate-200 hover:border-blue-400 hover:shadow-md transition bg-slate-50/50 flex flex-col justify-between group"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded">
-                    {p.departmentName || 'Public Works'}
-                  </span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                    p.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' :
-                    p.status === 'InProgress' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
-                  }`}>
-                    {p.status}
-                  </span>
-                </div>
-                <h3 className="font-bold text-slate-900 text-sm group-hover:text-blue-600 transition">
-                  {p.name}
-                </h3>
-                <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                  {p.description}
-                </p>
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-slate-200/80">
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="text-slate-500">Progress</span>
-                  <span className="font-bold text-slate-700">{p.progressPercentage}%</span>
-                </div>
-                <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                  <div 
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-500" 
-                    style={{ width: `${Math.min(100, Math.max(0, p.progressPercentage))}%` }}
-                  />
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </div>
+      {/* Modals */}
+      <CreatePostModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
+      <ChallengeModal
+        post={challengingPost}
+        isOpen={!!challengingPost}
+        onClose={() => setChallengingPost(null)}
+      />
+      <GovResponseModal
+        post={clarifyingPost}
+        isOpen={!!clarifyingPost}
+        onClose={() => setClarifyingPost(null)}
+      />
     </div>
   )
 }

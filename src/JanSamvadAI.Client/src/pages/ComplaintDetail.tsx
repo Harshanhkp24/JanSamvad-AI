@@ -1,380 +1,332 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import api from '../services/api'
-import { useAuth } from '../context/AuthContext'
-import { 
-  MessageSquareCheck, 
-  ArrowLeft, 
-  Sparkles, 
-  Clock, 
-  CheckCircle2, 
-  AlertCircle, 
-  User, 
-  MapPin, 
-  Star, 
+import { useJanSamvad } from '../context/JanSamvadContext'
+import {
+  MessageSquareCheck,
+  ArrowLeft,
+  MapPin,
+  Building2,
+  FolderKanban,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  Sparkles,
+  Star,
   Send,
-  Building,
-  History,
-  ShieldAlert,
-  ChevronRight
+  UserCheck,
+  ShieldCheck,
+  RotateCcw
 } from 'lucide-react'
 
 export default function ComplaintDetail() {
   const { id } = useParams<{ id: string }>()
-  const { user } = useAuth()
+  const {
+    currentDistrict,
+    currentUser,
+    updateGrievanceStatus,
+    submitGrievanceFeedback
+  } = useJanSamvad()
 
-  const [complaint, setComplaint] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const grievance = currentDistrict.grievances.find(g => g.id === id)
 
-  // Status update modal state
-  const [newStatus, setNewStatus] = useState('')
-  const [statusRemarks, setStatusRemarks] = useState('')
-  const [updatingStatus, setUpdatingStatus] = useState(false)
+  // Local state for officer resolution remarks
+  const [officerRemarks, setOfficerRemarks] = useState('')
+  const [targetStatus, setTargetStatus] = useState<'Open' | 'InProgress' | 'Resolved' | 'Rejected'>('Resolved')
 
-  // Citizen feedback state
-  const [rating, setRating] = useState<number>(5)
+  // Local state for citizen rating on resolution
+  const [starRating, setStarRating] = useState(5)
   const [feedbackComment, setFeedbackComment] = useState('')
-  const [submittingFeedback, setSubmittingFeedback] = useState(false)
-  const [feedbackSuccess, setFeedbackSuccess] = useState(false)
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
 
-  const fetchComplaint = async () => {
-    if (!id) return
-    setLoading(true)
-    setError(null)
-
-    try {
-      const res = await api.get(`/api/complaints/${id}`)
-      if (res.data?.data) {
-        setComplaint(res.data.data)
-        setNewStatus(res.data.data.status)
-      } else {
-        throw new Error('Grievance not found')
-      }
-    } catch (e: any) {
-      setError(e?.message || 'Failed to fetch grievance details')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchComplaint()
-  }, [id])
-
-  const handleStatusUpdate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!id || !newStatus) return
-
-    setUpdatingStatus(true)
-    try {
-      await api.patch(`/api/complaints/${id}/status`, {
-        newStatus,
-        remarks: statusRemarks
-      })
-      setStatusRemarks('')
-      await fetchComplaint()
-      alert('Status updated successfully.')
-    } catch (err: any) {
-      alert(err?.response?.data?.message || 'Failed to update grievance status')
-    } finally {
-      setUpdatingStatus(false)
-    }
-  }
-
-  const handleFeedbackSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!id) return
-
-    setSubmittingFeedback(true)
-    setFeedbackSuccess(false)
-
-    try {
-      await api.post(`/api/complaints/${id}/feedback`, {
-        rating,
-        comment: feedbackComment
-      })
-      setFeedbackComment('')
-      setFeedbackSuccess(true)
-      await fetchComplaint()
-    } catch (err: any) {
-      alert(err?.response?.data?.message || 'Failed to record feedback')
-    } finally {
-      setSubmittingFeedback(false)
-    }
-  }
-
-  if (loading) {
+  if (!grievance) {
     return (
-      <div className="py-12 text-center text-slate-500">
-        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-        <p className="text-sm font-medium">Loading grievance dossier...</p>
-      </div>
-    )
-  }
-
-  if (error || !complaint) {
-    return (
-      <div className="max-w-lg mx-auto py-12 text-center space-y-4">
-        <div className="p-4 bg-rose-50 text-rose-700 rounded-2xl border border-rose-200 text-sm">
-          {error || 'Grievance record not found.'}
+      <div className="max-w-lg mx-auto py-16 text-center space-y-4">
+        <div className="p-6 bg-rose-50 border border-rose-200 text-rose-700 rounded-3xl text-sm">
+          Grievance record not found in {currentDistrict.name} district dataset.
         </div>
-        <Link to="/complaints" className="inline-flex items-center gap-2 text-xs font-bold text-blue-600 hover:underline">
-          <ArrowLeft className="w-4 h-4" /> Back to Grievances
+        <Link
+          to="/complaints"
+          className="inline-flex items-center gap-2 text-xs font-bold text-blue-600 hover:underline"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to District Grievances
         </Link>
       </div>
     )
   }
 
-  const aiClassification = complaint.aiClassifications && complaint.aiClassifications.length > 0 ? complaint.aiClassifications[0] : null
+  const isOfficerOrAdmin = currentUser?.role === 'officer' || currentUser?.role === 'admin'
+
+  const handleStatusUpdate = (e: React.FormEvent) => {
+    e.preventDefault()
+    updateGrievanceStatus(grievance.id, targetStatus, officerRemarks)
+    setOfficerRemarks('')
+  }
+
+  const handleFeedbackSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!feedbackComment.trim()) return
+    submitGrievanceFeedback(grievance.id, starRating, feedbackComment.trim())
+    setFeedbackSubmitted(true)
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Resolved':
+        return (
+          <span className="bg-emerald-100 text-emerald-800 text-xs font-extrabold px-3 py-1 rounded-full flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4" /> Resolved
+          </span>
+        )
+      case 'InProgress':
+        return (
+          <span className="bg-amber-100 text-amber-800 text-xs font-extrabold px-3 py-1 rounded-full flex items-center gap-1.5">
+            <Clock className="w-4 h-4" /> In Progress
+          </span>
+        )
+      default:
+        return (
+          <span className="bg-rose-100 text-rose-800 text-xs font-extrabold px-3 py-1 rounded-full flex items-center gap-1.5">
+            <AlertCircle className="w-4 h-4" /> Open
+          </span>
+        )
+    }
+  }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-16">
-      {/* Top Breadcrumb */}
+    <div className="max-w-4xl mx-auto space-y-6 pb-24">
+      
+      {/* Top Back Nav */}
       <div className="flex items-center justify-between">
-        <Link to="/complaints" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-blue-600 transition">
+        <Link
+          to="/complaints"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-blue-600 transition"
+        >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Grievances</span>
         </Link>
-        <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-lg border border-blue-200/60">
-          {complaint.complaintNumber}
+        <span className="font-mono text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+          {grievance.complaintNumber}
         </span>
       </div>
 
-      {/* Main Grievance Dossier Card */}
-      <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+      {/* Main Grievance Card */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 md:p-8 space-y-6">
+        
+        {/* Header Row */}
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4 border-b border-slate-100">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-0.5 rounded-lg uppercase">
-                {complaint.categoryName || 'GENERAL'}
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-0.5 rounded-full">
+                <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                {grievance.sector}, {currentDistrict.name}
               </span>
-              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-lg ${
-                complaint.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800' :
-                complaint.status === 'InProgress' ? 'bg-blue-100 text-blue-800' :
-                complaint.status === 'Rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
-              }`}>
-                {complaint.status}
-              </span>
-              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-lg ${
-                complaint.priority === 'Critical' ? 'bg-rose-100 text-rose-800' :
-                complaint.priority === 'High' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'
-              }`}>
-                Priority: {complaint.priority}
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full">
+                <Building2 className="w-3.5 h-3.5" />
+                {grievance.department}
               </span>
             </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900">
-              {complaint.title}
+            <h1 className="text-2xl font-black text-slate-900 leading-tight">
+              {grievance.title}
             </h1>
+          </div>
+
+          <div className="flex-shrink-0">
+            {getStatusBadge(grievance.status)}
           </div>
         </div>
 
-        {/* Description Body */}
-        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80">
-          <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-            Grievance Description
+        {/* Details Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
+            <div className="text-[10px] text-slate-400 font-bold uppercase">Complainant</div>
+            <div className="font-extrabold text-slate-900 mt-1">{grievance.citizenName}</div>
           </div>
-          <p className="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap">
-            {complaint.description}
+
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
+            <div className="text-[10px] text-slate-400 font-bold uppercase">Filing Date</div>
+            <div className="font-extrabold text-slate-900 mt-1">{grievance.createdAt}</div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
+            <div className="text-[10px] text-slate-400 font-bold uppercase">Priority</div>
+            <div className="font-extrabold text-blue-700 mt-1">{grievance.priority} Priority</div>
+          </div>
+        </div>
+
+        {/* Description */}
+        <div className="space-y-1.5">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            Detailed Issue Report
+          </h3>
+          <p className="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap bg-slate-50/50 p-4 rounded-2xl border border-slate-100 font-medium">
+            {grievance.description}
           </p>
         </div>
 
-        {/* Metadata Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-slate-100 text-xs">
-          <div>
-            <span className="text-slate-400 font-medium block">Department Assigned</span>
-            <span className="font-bold text-slate-800 mt-0.5 flex items-center gap-1">
-              <Building className="w-3.5 h-3.5 text-blue-600" />
-              {complaint.departmentName || 'Public Works'}
-            </span>
+        {/* Location & Linked Project */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
+            <div className="text-[10px] font-bold text-slate-400 uppercase">Exact Location / Landmark</div>
+            <div className="font-semibold text-slate-800">{grievance.locationDetails}</div>
           </div>
-          <div>
-            <span className="text-slate-400 font-medium block">Ward Locality</span>
-            <span className="font-bold text-slate-800 mt-0.5 flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-              {complaint.wardName || `Ward #${complaint.wardId}`}
-            </span>
-          </div>
-          <div>
-            <span className="text-slate-400 font-medium block">Citizen Reporter</span>
-            <span className="font-bold text-slate-800 mt-0.5 flex items-center gap-1">
-              <User className="w-3.5 h-3.5 text-purple-600" />
-              {complaint.citizenName}
-            </span>
-          </div>
-          <div>
-            <span className="text-slate-400 font-medium block">Date Filed</span>
-            <span className="font-bold text-slate-800 mt-0.5 block">
-              {new Date(complaint.createdAt).toLocaleDateString()}
-            </span>
+
+          <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-200 space-y-1">
+            <div className="text-[10px] font-bold text-blue-700 uppercase">Connected Government Project</div>
+            {grievance.projectId ? (
+              <Link
+                to={`/projects/${grievance.projectId}`}
+                className="font-bold text-blue-900 hover:underline flex items-center gap-1 mt-0.5"
+              >
+                <FolderKanban className="w-3.5 h-3.5 text-blue-600" />
+                <span>{grievance.projectName || 'View Connected Project'} &rarr;</span>
+              </Link>
+            ) : (
+              <div className="text-slate-500 italic">No specific project linked (General municipal defect)</div>
+            )}
           </div>
         </div>
-      </div>
 
-      {/* AI Intelligence Classification Badge */}
-      {aiClassification && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50/70 p-5 rounded-2xl border border-blue-200/80 shadow-xs flex items-start gap-3">
-          <div className="p-2.5 rounded-xl bg-blue-600 text-white shadow-sm flex-shrink-0">
-            <Sparkles className="w-5 h-5" />
-          </div>
-          <div className="space-y-1 flex-1 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-blue-900 text-sm flex items-center gap-1.5">
-                AI Automated Redressal Routing
-              </span>
-              <span className="bg-white/80 border border-blue-200 text-blue-700 font-mono px-2 py-0.5 rounded font-bold">
-                {Math.round(aiClassification.confidenceScore * 100)}% Confidence
-              </span>
+        {/* Resolution Remarks if any */}
+        {grievance.resolutionRemarks && (
+          <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-1 text-xs">
+            <div className="font-extrabold text-emerald-900 uppercase flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              Department Officer Resolution Remarks
             </div>
-            <p className="text-blue-800 leading-relaxed">
-              Analyzed using <strong>{aiClassification.modelVersion}</strong> NLP engine. Routed automatically to <strong>{aiClassification.recommendedDepartmentName || 'Assigned Department'}</strong> with <strong>{aiClassification.recommendedPriority}</strong> priority recommendation.
+            <p className="text-emerald-950 leading-relaxed font-medium">
+              {grievance.resolutionRemarks}
             </p>
-          </div>
-        </div>
-      )}
-
-      {/* Officer Action Card (Change Status) */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-          <ShieldAlert className="w-4 h-4 text-blue-600" />
-          Administrative Status Transition
-        </h3>
-        <form onSubmit={handleStatusUpdate} className="flex flex-col sm:flex-row gap-3 items-end">
-          <div className="w-full sm:w-48">
-            <label className="block text-xs font-bold text-slate-600 mb-1">Status</label>
-            <select
-              value={newStatus}
-              onChange={e => setNewStatus(e.target.value)}
-              className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-semibold focus:border-blue-600 outline-none bg-white"
-            >
-              <option value="Open">Open</option>
-              <option value="InProgress">In Progress</option>
-              <option value="Resolved">Resolved</option>
-              <option value="Rejected">Rejected</option>
-            </select>
-          </div>
-
-          <div className="flex-1 w-full">
-            <label className="block text-xs font-bold text-slate-600 mb-1">Audit Remarks</label>
-            <input
-              type="text"
-              value={statusRemarks}
-              onChange={e => setStatusRemarks(e.target.value)}
-              placeholder="e.g. Field team dispatched, repair completed..."
-              className="w-full p-2.5 rounded-xl border border-slate-300 text-xs focus:border-blue-600 outline-none"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={updatingStatus}
-            className="w-full sm:w-auto px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition cursor-pointer"
-          >
-            {updatingStatus ? 'Updating...' : 'Apply Status'}
-          </button>
-        </form>
-      </div>
-
-      {/* Redressal History Timeline */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-          <History className="w-4 h-4 text-indigo-600" />
-          Resolution Audit Timeline
-        </h3>
-
-        {complaint.history.length === 0 ? (
-          <div className="text-xs text-slate-400">No status transitions logged yet.</div>
-        ) : (
-          <div className="space-y-4 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
-            {complaint.history.map((h: any, idx: number) => (
-              <div key={h.id || idx} className="flex items-start gap-4 relative pl-1">
-                <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold z-10 flex-shrink-0">
-                  {idx + 1}
-                </div>
-                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex-1 text-xs space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-800">
-                      Status: <span className="text-blue-700">{h.newStatus}</span>
-                      {h.oldStatus && <span className="text-slate-400 font-normal"> (from {h.oldStatus})</span>}
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      {new Date(h.changedAt).toLocaleString()}
-                    </span>
-                  </div>
-                  <p className="text-slate-600">{h.remarks || 'Status modified'}</p>
-                  <span className="text-[10px] text-slate-400 block font-medium">Logged by: {h.changedByName}</span>
-                </div>
-              </div>
-            ))}
+            {grievance.resolvedAt && (
+              <div className="text-[10px] text-emerald-700 mt-1">Resolved on {grievance.resolvedAt}</div>
+            )}
           </div>
         )}
-      </div>
 
-      {/* Citizen Feedback Section */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-          <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-          Citizen Satisfaction & Feedback
-        </h3>
+        {/* Officer Status Management (When logged in as Officer/Admin) */}
+        {isOfficerOrAdmin && (
+          <form onSubmit={handleStatusUpdate} className="p-5 rounded-2xl bg-slate-900 text-white space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black uppercase tracking-wider text-blue-300 flex items-center gap-1.5">
+                <UserCheck className="w-4 h-4" />
+                Department Action Panel (Officer Oversight)
+              </span>
+            </div>
 
-        {/* Feedback form */}
-        <form onSubmit={handleFeedbackSubmit} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-          <div className="text-xs font-bold text-slate-700">Rate the Resolution Quality</div>
-          <div className="flex items-center gap-2">
-            {[1, 2, 3, 4, 5].map(st => (
-              <button
-                key={st}
-                type="button"
-                onClick={() => setRating(st)}
-                className="p-1 cursor-pointer transition transform hover:scale-110"
-              >
-                <Star
-                  className={`w-6 h-6 ${st <= rating ? 'text-amber-500 fill-amber-500' : 'text-slate-300'}`}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-slate-300 mb-1">
+                  Change Status
+                </label>
+                <select
+                  value={targetStatus}
+                  onChange={e => setTargetStatus(e.target.value as any)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs font-bold text-white outline-none"
+                >
+                  <option value="InProgress">In Progress</option>
+                  <option value="Resolved">Resolved</option>
+                  <option value="Open">Open</option>
+                  <option value="Rejected">Rejected</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-slate-300 mb-1">
+                  Official Action / Resolution Remarks
+                </label>
+                <input
+                  type="text"
+                  value={officerRemarks}
+                  onChange={e => setOfficerRemarks(e.target.value)}
+                  placeholder="e.g. Field inspection complete; pipeline pressure valve calibrated."
+                  className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-white outline-none"
                 />
-              </button>
-            ))}
-            <span className="text-xs font-bold text-slate-700 ml-2">{rating} / 5 Stars</span>
-          </div>
+              </div>
+            </div>
 
-          <textarea
-            rows={2}
-            value={feedbackComment}
-            onChange={e => setFeedbackComment(e.target.value)}
-            placeholder="Provide comments regarding resolution speed or officer conduct..."
-            className="w-full p-2.5 rounded-lg border border-slate-300 text-xs focus:border-blue-600 outline-none"
-          />
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition"
+            >
+              Update Grievance Status
+            </button>
+          </form>
+        )}
 
-          <button
-            type="submit"
-            disabled={submittingFeedback}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-1 cursor-pointer"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span>{submittingFeedback ? 'Submitting...' : 'Submit Citizen Rating'}</span>
-          </button>
+        {/* Citizen Feedback Section (When Grievance is Resolved) */}
+        {grievance.status === 'Resolved' && (
+          <div className="pt-4 border-t border-slate-100 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                <Star className="w-4 h-4 text-amber-500 fill-amber-400" />
+                Citizen Redressal Verification & Feedback
+              </h3>
+            </div>
 
-          {feedbackSuccess && (
-            <div className="text-xs text-emerald-600 font-semibold">Thank you! Your feedback has been recorded.</div>
-          )}
-        </form>
-
-        {/* Existing feedback list */}
-        {complaint.feedback && complaint.feedback.length > 0 && (
-          <div className="divide-y divide-slate-100 pt-2 space-y-3">
-            {complaint.feedback.map((f: any) => (
-              <div key={f.id} className="pt-3 text-xs space-y-1">
+            {grievance.feedbackRating ? (
+              <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-800">{f.citizenName}</span>
-                  <div className="flex items-center text-amber-500">
-                    {Array.from({ length: f.rating }).map((_, i) => (
-                      <Star key={i} className="w-3 h-3 fill-amber-500" />
-                    ))}
+                  <span className="font-bold text-amber-950">
+                    Complainant Verification Rating:
+                  </span>
+                  <div className="flex items-center gap-1 font-extrabold text-amber-700">
+                    <Star className="w-3.5 h-3.5 fill-amber-400" />
+                    <span>{grievance.feedbackRating}.0 / 5.0</span>
                   </div>
                 </div>
-                {f.comment && <p className="text-slate-600">{f.comment}</p>}
-                <span className="text-[10px] text-slate-400">{new Date(f.createdAt).toLocaleDateString()}</span>
+                <p className="text-amber-900 leading-relaxed font-medium">
+                  "{grievance.feedbackComment}"
+                </p>
               </div>
-            ))}
+            ) : !feedbackSubmitted ? (
+              <form onSubmit={handleFeedbackSubmit} className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="text-xs font-bold text-slate-800">
+                  Was your issue resolved satisfactorily by the department?
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setStarRating(star)}
+                      className="p-1 hover:scale-110 transition cursor-pointer"
+                    >
+                      <Star
+                        className={`w-6 h-6 ${
+                          star <= starRating
+                            ? 'text-amber-500 fill-amber-400'
+                            : 'text-slate-300'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                  <span className="text-xs font-bold text-slate-700 ml-2">
+                    {starRating} Stars
+                  </span>
+                </div>
+
+                <textarea
+                  required
+                  rows={2}
+                  value={feedbackComment}
+                  onChange={e => setFeedbackComment(e.target.value)}
+                  placeholder="Share feedback on resolution quality (e.g., 'Water supply has improved, pressure is consistent')..."
+                  className="w-full px-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 focus:border-blue-600 outline-none resize-none"
+                />
+
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition"
+                >
+                  Submit Redressal Feedback
+                </button>
+              </form>
+            ) : (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-bold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                Thank you! Your citizen satisfaction rating has been recorded in the public ledger.
+              </div>
+            )}
           </div>
         )}
       </div>
