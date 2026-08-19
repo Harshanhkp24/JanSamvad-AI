@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: jansamvad-db
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=JanSamvad@Pass2026!
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - jansamvad-net
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'JanSamvad@Pass2026!' -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  ai-service:
+    build:
+      context: ./src/JanSamvadAI.AI
+      dockerfile: Dockerfile
+    container_name: jansamvad-ai
+    ports:
+      - "8001:8001"
+    networks:
+      - jansamvad-net
+
+  api:
+    build:
+      context: ./src/JanSamvadAI.Api
+      dockerfile: Dockerfile
+    container_name: jansamvad-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=JanSamvadAIDb;User Id=sa;Password=JanSamvad@Pass2026!;TrustServerCertificate=True;MultipleActiveResultSets=true;
+      - AiService__Url=http://ai-service:8001
+    ports:
+      - "5000:5000"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      ai-service:
+        condition: service_started
+    networks:
+      - jansamvad-net
+
+  client:
+    build:
+      context: ./src/JanSamvadAI.Client
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:5000
+    container_name: jansamvad-client
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+    networks:
+      - jansamvad-net
+
+volumes:
+  sqlserver_data:
+
+networks:
+  jansamvad-net:
+    driver: bridge

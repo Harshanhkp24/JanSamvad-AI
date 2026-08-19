@@ -89,7 +89,7 @@ namespace JanSamvadAI.Api.Seed
                 foreach (var c in cats)
                 {
                     var dep = deptMap[rnd.Next(deptMap.Count)];
-                    _db.ComplaintCategories.Add(new ComplaintCategory { Name = c, Description = c + " issues", DefaultDepartmentId = dep.Id, IsActive = true });
+                    _db.ComplaintCategories.Add(new ComplaintCategory { Name = c, Code = c, Description = c + " issues", DefaultDepartmentId = dep.Id, IsActive = true });
                 }
                 await _db.SaveChangesAsync();
             }

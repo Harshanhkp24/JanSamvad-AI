@@ -44,79 +44,56 @@
 
 ## 🚀 Getting Started & Setup Guide
 
-### Prerequisites
-- [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- [Node.js 18+ & npm](https://nodejs.org/)
-- [Python 3.10+](https://www.python.org/)
-- [SQL Server Express / LocalDB](https://learn.microsoft.com/en-us/sql/database-engine/configure-windows/sql-server-express-localdb)
+### 🐳 Quick Start with Docker (Zero Dependencies Required - Recommended)
+
+If you have Docker installed, you can launch the complete full-stack system (SQL Server, ASP.NET Core API, AI Service, and React Frontend) with **one single command**:
+
+```bash
+docker compose up --build
+```
+
+- **Frontend App**: 👉 [http://localhost:5173](http://localhost:5173)
+- **Backend API & Swagger**: 👉 [http://localhost:5000/swagger](http://localhost:5000/swagger)
+- **AI NLP Service**: 👉 [http://localhost:8001/ai/health](http://localhost:8001/ai/health)
 
 ---
 
-### 1. Backend Setup (ASP.NET Core API)
+### 💻 Local Development Setup (Manual)
 
-1. Open a terminal and navigate to the API directory:
-   ```powershell
-   cd "c:\HarshanLaptop\E d\JanSamvad-AI\src\JanSamvadAI.Api"
-   ```
-2. Check or customize your connection string in `appsettings.Development.json`:
-   ```json
-   {
-     "ConnectionStrings": {
-       "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=JanSamvadAIDb;Trusted_Connection=True;MultipleActiveResultSets=true"
-     }
-   }
-   ```
-3. Restore packages, run migrations, and start the API server:
-   ```powershell
-   dotnet restore
-   dotnet run --urls "http://localhost:5000;https://localhost:5001"
-   ```
-   *Note: On first startup, `SeedDataService` will automatically apply migrations and seed the synthetic dataset (districts, wards, contractors, 50 projects with financial data, and ~3,000 complaints).*
+#### 1-Click Launch (Windows PowerShell)
+You can run the included launcher script from the root directory to start both Backend and Frontend in separate windows:
+```powershell
+.\start-dev.ps1
+```
 
-4. Explore the interactive API documentation at:
-   👉 **`http://localhost:5000/swagger`**
+#### Step-by-Step Manual Setup
 
----
+##### 1. Backend Setup (ASP.NET Core API)
+```powershell
+cd src/JanSamvadAI.Api
+dotnet restore
+dotnet run --urls "http://localhost:5000;https://localhost:5001"
+```
+*Note: On first startup, `SeedDataService` will automatically apply migrations and seed the synthetic dataset (districts, wards, contractors, 50 projects with financial data, and ~3,000 complaints).*
+👉 Swagger UI: **`http://localhost:5000/swagger`**
 
-### 2. Frontend Setup (React Client)
+##### 2. Frontend Setup (React Client)
+```powershell
+cd src/JanSamvadAI.Client
+npm install
+npm run dev
+```
+👉 Web App: **`http://localhost:5173`**
 
-1. Open a new terminal and navigate to the Client directory:
-   ```powershell
-   cd "c:\HarshanLaptop\E d\JanSamvad-AI\src\JanSamvadAI.Client"
-   ```
-2. Install dependencies:
-   ```powershell
-   npm install
-   ```
-3. Start the Vite development server:
-   ```powershell
-   npm run dev
-   ```
-4. Access the web application at:
-   👉 **`http://localhost:5173`**
-
----
-
-### 3. AI Service Setup (FastAPI Python)
-
-1. Open a new terminal and navigate to the AI directory:
-   ```powershell
-   cd "c:\HarshanLaptop\E d\JanSamvad-AI\src\JanSamvadAI.AI"
-   ```
-2. Create and activate a Python virtual environment:
-   ```powershell
-   python -m venv venv
-   .\venv\Scripts\Activate.ps1
-   ```
-3. Install dependencies:
-   ```powershell
-   pip install -r requirements.txt
-   ```
-4. Run the FastAPI microservice:
-   ```powershell
-   uvicorn main:app --reload --port 8001
-   ```
-   *Note: If the AI microservice is not running, the ASP.NET Core backend gracefully falls back to an internal heuristic classification engine.*
+##### 3. Optional: AI NLP Service (FastAPI Python)
+```powershell
+cd src/JanSamvadAI.AI
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8001
+```
+*Note: If the Python AI microservice is not running, the ASP.NET Core backend gracefully falls back to its built-in C# heuristic classification engine automatically.*
 
 ---
 
