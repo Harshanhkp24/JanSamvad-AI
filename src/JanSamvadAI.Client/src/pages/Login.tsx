@@ -1,171 +1,430 @@
 import React, { useState } from 'react'
-import api from '../services/api'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
-import { Lock, Mail, ShieldCheck, UserCheck, ArrowRight, AlertCircle } from 'lucide-react'
+import { useJanSamvad } from '../context/JanSamvadContext'
+import { CitizenRecord } from '../types'
+import {
+  ShieldCheck,
+  Lock,
+  ArrowRight,
+  AlertCircle,
+  CheckCircle2,
+  MapPin,
+  Landmark,
+  UserCheck,
+  Building2,
+  ShieldAlert,
+  Shield,
+  Sparkles
+} from 'lucide-react'
 
 export default function Login() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const { login } = useAuth()
-  const nav = useNavigate()
+  const { loginWithGovId, loginAsRole } = useJanSamvad()
+  const navigate = useNavigate()
 
-  const demoAccounts = [
-    { role: 'Representative', email: 'representative@jansamvad.demo', color: 'border-blue-500 hover:bg-blue-50 text-blue-700' },
-    { role: 'Citizen', email: 'citizen@jansamvad.demo', color: 'border-emerald-500 hover:bg-emerald-50 text-emerald-700' },
-    { role: 'Officer', email: 'officer@jansamvad.demo', color: 'border-purple-500 hover:bg-purple-50 text-purple-700' },
-    { role: 'Opposition', email: 'opposition@jansamvad.demo', color: 'border-amber-500 hover:bg-amber-50 text-amber-700' },
-    { role: 'Admin', email: 'admin@jansamvad.demo', color: 'border-rose-500 hover:bg-rose-50 text-rose-700' },
+  const [activeTab, setActiveTab] = useState<'citizen' | 'officials'>('citizen')
+
+  // Citizen form state
+  const [govId, setGovId] = useState('GOV-HR-FBD-10021')
+  const [pinCode, setPinCode] = useState('121001')
+  const [verificationResult, setVerificationResult] = useState<{
+    verified: boolean
+    user?: CitizenRecord
+    error?: string
+  } | null>(null)
+  const [isVerifying, setIsVerifying] = useState(false)
+
+  // Sample Pseudo Citizen IDs from requirements
+  const sampleCitizens = [
+    {
+      name: 'Rahul Sharma',
+      govId: 'GOV-HR-FBD-10021',
+      pin: '121001',
+      district: 'Faridabad',
+      rep: 'Aarav Sharma'
+    },
+    {
+      name: 'Aisha Khan',
+      govId: 'GOV-HR-FBD-10022',
+      pin: '121003',
+      district: 'Faridabad',
+      rep: 'Aarav Sharma'
+    },
+    {
+      name: 'Arjun Verma',
+      govId: 'GOV-HR-FBD-10023',
+      pin: '121006',
+      district: 'Faridabad',
+      rep: 'Aarav Sharma'
+    },
+    {
+      name: 'Priya Singh',
+      govId: 'GOV-HR-GGM-20021',
+      pin: '122001',
+      district: 'Gurugram',
+      rep: 'Meera Kapoor'
+    },
+    {
+      name: 'Rohan Mehta',
+      govId: 'GOV-HR-GGM-20022',
+      pin: '122002',
+      district: 'Gurugram',
+      rep: 'Meera Kapoor'
+    },
+    {
+      name: 'Sana Kapoor',
+      govId: 'GOV-HR-GGM-20023',
+      pin: '122018',
+      district: 'Gurugram',
+      rep: 'Meera Kapoor'
+    }
   ]
 
-  const selectDemoAccount = (demoEmail: string) => {
-    setEmail(demoEmail)
-    setPassword('P@ssword1!')
-    setError(null)
+  const handleCitizenSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsVerifying(true)
+    setVerificationResult(null)
+
+    setTimeout(() => {
+      const res = loginWithGovId(govId, pinCode)
+      if (res.success && res.user) {
+        setVerificationResult({ verified: true, user: res.user })
+      } else {
+        setVerificationResult({ verified: false, error: res.error })
+      }
+      setIsVerifying(false)
+    }, 400)
   }
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setLoading(true)
-
-    try {
-      const res = await api.post('/api/auth/login', { email, password })
-      const token = res.data.data.token
-      const userData = res.data.data.user
-
-      // Fetch user profile to ensure roles are populated
-      try {
-        localStorage.setItem('token', token)
-        const meRes = await api.get('/api/auth/me')
-        if (meRes.data?.data) {
-          userData.roles = meRes.data.data.roles || []
-        }
-      } catch (err) {
-        console.warn('Could not fetch extra roles', err)
-      }
-
-      login(token, userData)
-      setLoading(false)
-      nav('/')
-    } catch (ex: any) {
-      setLoading(false)
-      const resp = ex?.response?.data
-      if (resp) {
-        if (resp.errors) setError(Array.isArray(resp.errors) ? resp.errors.join('; ') : String(resp.errors))
-        else if (resp.message) setError(resp.message)
-        else setError(JSON.stringify(resp))
-      } else {
-        setError(ex?.message || 'Login failed. Please check your credentials or backend server.')
-      }
-    }
+  const handleProceed = () => {
+    navigate('/')
   }
 
   return (
-    <div className="max-w-xl mx-auto my-8">
+    <div className="max-w-xl mx-auto my-6 space-y-6">
+      
       {/* Header */}
-      <div className="text-center mb-8">
-        <div className="inline-flex p-3 rounded-full bg-blue-100 text-blue-700 mb-3 shadow-inner">
-          <ShieldCheck className="w-8 h-8" />
+      <div className="text-center space-y-2">
+        <div className="inline-flex p-3.5 rounded-3xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-md">
+          <Landmark className="w-8 h-8" />
         </div>
-        <h1 className="text-3xl font-extrabold text-slate-900">JanSamvad AI Portal</h1>
-        <p className="text-slate-600 mt-2 text-sm">
-          Civic Intelligence, Public Fund Auditing & Automated Grievance Redressal
+        <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+          JanSamvad <span className="text-blue-600">AI</span>
+        </h1>
+        <p className="text-xs md:text-sm text-slate-500 font-medium">
+          Democratic District Accountability & Civic Verification Platform
         </p>
       </div>
 
-      {/* Demo Account Quick Switcher */}
-      <div className="bg-gradient-to-br from-slate-50 to-blue-50/40 p-5 rounded-2xl border border-slate-200/80 shadow-sm mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-            <UserCheck className="w-4 h-4 text-blue-600" />
-            Quick 1-Click Demo Login
-          </div>
-          <span className="text-xs text-slate-400 bg-white px-2 py-0.5 rounded border border-slate-200">
-            Auto-fills `P@ssword1!`
-          </span>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {demoAccounts.map(acc => (
-            <button
-              key={acc.email}
-              type="button"
-              onClick={() => selectDemoAccount(acc.email)}
-              className={`p-2 text-left rounded-xl border transition-all text-xs font-semibold flex flex-col justify-between bg-white shadow-sm ${acc.color} ${email === acc.email ? 'ring-2 ring-blue-500 font-bold' : ''}`}
-            >
-              <span>{acc.role}</span>
-              <span className="text-[10px] text-slate-400 font-normal truncate mt-0.5">{acc.email.split('@')[0]}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Login Form */}
-      <form onSubmit={submit} className="bg-white p-7 rounded-2xl border border-slate-200/80 shadow-md">
-        {error && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3.5 rounded-xl mb-5 text-sm flex items-start gap-2.5">
-            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <div className="whitespace-pre-wrap">{error}</div>
-          </div>
-        )}
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-              Email Address
-            </label>
-            <div className="relative">
-              <Mail className="w-5 h-5 text-slate-400 absolute left-3 top-3" />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="e.g. representative@jansamvad.demo"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition text-sm"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-              Password
-            </label>
-            <div className="relative">
-              <Lock className="w-5 h-5 text-slate-400 absolute left-3 top-3" />
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition text-sm"
-              />
-            </div>
-          </div>
-        </div>
-
+      {/* Mode Switcher Tabs */}
+      <div className="flex rounded-2xl bg-slate-200/80 p-1 text-xs font-bold shadow-inner">
         <button
-          type="submit"
-          disabled={loading}
-          className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70 cursor-pointer"
+          type="button"
+          onClick={() => {
+            setActiveTab('citizen')
+            setVerificationResult(null)
+          }}
+          className={`flex-1 py-2.5 rounded-xl transition flex items-center justify-center gap-2 ${
+            activeTab === 'citizen'
+              ? 'bg-white text-blue-700 shadow-2xs font-extrabold'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
         >
-          {loading ? (
-            <span>Signing in...</span>
-          ) : (
-            <>
-              <span>Sign In to Dashboard</span>
-              <ArrowRight className="w-4 h-4" />
-            </>
-          )}
+          <ShieldCheck className="w-4 h-4 text-emerald-600" />
+          <span>Citizen ID Verification</span>
         </button>
 
-        <div className="text-center text-xs text-slate-400 mt-4">
-          Synthetic Prototype &bull; Local Development Only
+        <button
+          type="button"
+          onClick={() => setActiveTab('officials')}
+          className={`flex-1 py-2.5 rounded-xl transition flex items-center justify-center gap-2 ${
+            activeTab === 'officials'
+              ? 'bg-white text-blue-700 shadow-2xs font-extrabold'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <UserCheck className="w-4 h-4 text-indigo-600" />
+          <span>Representatives & Officers</span>
+        </button>
+      </div>
+
+      {/* Tab 1: Citizen Simulated Gov ID Login */}
+      {activeTab === 'citizen' && (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-md p-6 md:p-8 space-y-6">
+          
+          <div className="space-y-1">
+            <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-emerald-600" />
+              Citizen Identity Verification
+            </h2>
+            <p className="text-xs text-slate-500">
+              Enter your simulated government ID and postal PIN to determine your district & representative.
+            </p>
+          </div>
+
+          {/* Sample IDs Quick Fill */}
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+            <div className="flex items-center justify-between text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+              <span className="flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                Sample Demo Identities (1-Click Select):
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {sampleCitizens.map((c, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setGovId(c.govId)
+                    setPinCode(c.pin)
+                    setVerificationResult(null)
+                  }}
+                  className={`p-2 text-left rounded-xl border text-xs font-semibold transition ${
+                    govId === c.govId
+                      ? 'bg-blue-50 border-blue-400 text-blue-900 ring-1 ring-blue-400 font-bold'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="truncate text-slate-900">{c.name}</div>
+                  <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">{c.govId}</div>
+                  <div className="text-[10px] text-blue-600 font-bold">📍 {c.district}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleCitizenSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Government ID
+              </label>
+              <input
+                type="text"
+                required
+                value={govId}
+                onChange={e => {
+                  setGovId(e.target.value)
+                  setVerificationResult(null)
+                }}
+                placeholder="e.g. GOV-HR-FBD-10021"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-bold focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none uppercase"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Postal PIN Code
+              </label>
+              <input
+                type="text"
+                required
+                maxLength={6}
+                value={pinCode}
+                onChange={e => {
+                  setPinCode(e.target.value)
+                  setVerificationResult(null)
+                }}
+                placeholder="e.g. 121001"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-bold focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isVerifying}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-extrabold rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {isVerifying ? (
+                <span>Verifying Identity...</span>
+              ) : (
+                <>
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Verify Identity</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Verification Feedback Result */}
+          {verificationResult && (
+            <div className="animate-in fade-in zoom-in-95 duration-150">
+              {verificationResult.verified && verificationResult.user ? (
+                <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-300 space-y-3">
+                  <div className="space-y-1 text-xs text-emerald-950 font-bold">
+                    <div className="flex items-center gap-1.5 text-emerald-700">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>✓ Identity Verified ({verificationResult.user.name})</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-emerald-700">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>✓ PIN Verified ({verificationResult.user.pinCode})</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-emerald-900 font-extrabold text-sm pt-1">
+                      <MapPin className="w-4 h-4 text-rose-500" />
+                      <span>District Assigned: {verificationResult.user.districtName}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-slate-700 text-xs">
+                      <Landmark className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Assigned Representative: <strong>{verificationResult.user.representativeName}</strong></span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleProceed}
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl shadow-sm transition flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span>Continue to JanSamvad Feed</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{verificationResult.error || 'Government ID or PIN could not be verified.'}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Prototype Notice Disclaimer */}
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] text-slate-500 leading-relaxed">
+            <span className="font-bold text-slate-700">Prototype Environment: </span>
+            Government ID verification is simulated using sample data. No real government identity database (Aadhaar, ECI) is connected.
+          </div>
         </div>
-      </form>
+      )}
+
+      {/* Tab 2: Officials & Role Login */}
+      {activeTab === 'officials' && (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-md p-6 md:p-8 space-y-6">
+          <div className="space-y-1">
+            <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-indigo-600" />
+              Democratic Role & Official Logins
+            </h2>
+            <p className="text-xs text-slate-500">
+              Select an elected representative, opposition scrutinizer, or department officer to test specialized permissions:
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {/* Faridabad Group */}
+            <div className="space-y-2">
+              <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                Faridabad District Roles
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    loginAsRole('representative', 'faridabad')
+                    navigate('/')
+                  }}
+                  className="p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-left transition"
+                >
+                  <div className="font-extrabold text-blue-950 text-xs">Aarav Sharma</div>
+                  <div className="text-[10px] text-blue-700 font-semibold">District Representative (FBD)</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    loginAsRole('opposition', 'faridabad')
+                    navigate('/scrutiny')
+                  }}
+                  className="p-3 rounded-2xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-left transition"
+                >
+                  <div className="font-extrabold text-amber-950 text-xs">Rohan Mehta</div>
+                  <div className="text-[10px] text-amber-700 font-semibold">Opposition Representative (FBD)</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    loginAsRole('officer', 'faridabad', 'off-fbd-01')
+                    navigate('/projects')
+                  }}
+                  className="p-3 rounded-2xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-left transition"
+                >
+                  <div className="font-extrabold text-purple-950 text-xs">Anita Sharma</div>
+                  <div className="text-[10px] text-purple-700 font-semibold">Assistant Engineer (Water Supply)</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    loginAsRole('officer', 'faridabad', 'off-fbd-02')
+                    navigate('/projects')
+                  }}
+                  className="p-3 rounded-2xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-left transition"
+                >
+                  <div className="font-extrabold text-purple-950 text-xs">Rajiv Mehta</div>
+                  <div className="text-[10px] text-purple-700 font-semibold">Executive Engineer (Water Supply)</div>
+                </button>
+              </div>
+            </div>
+
+            {/* Gurugram Group */}
+            <div className="space-y-2 pt-2">
+              <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                Gurugram District Roles
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    loginAsRole('representative', 'gurugram')
+                    navigate('/')
+                  }}
+                  className="p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-left transition"
+                >
+                  <div className="font-extrabold text-blue-950 text-xs">Meera Kapoor</div>
+                  <div className="text-[10px] text-blue-700 font-semibold">District Representative (GGM)</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    loginAsRole('opposition', 'gurugram')
+                    navigate('/scrutiny')
+                  }}
+                  className="p-3 rounded-2xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-left transition"
+                >
+                  <div className="font-extrabold text-amber-950 text-xs">Sana Khan</div>
+                  <div className="text-[10px] text-amber-700 font-semibold">Opposition Representative (GGM)</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    loginAsRole('officer', 'gurugram', 'off-ggm-01')
+                    navigate('/projects')
+                  }}
+                  className="p-3 rounded-2xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-left transition"
+                >
+                  <div className="font-extrabold text-purple-950 text-xs">Deepak Malhotra</div>
+                  <div className="text-[10px] text-purple-700 font-semibold">Executive Engineer (PWD)</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    loginAsRole('admin', 'gurugram')
+                    navigate('/accountability')
+                  }}
+                  className="p-3 rounded-2xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-left transition"
+                >
+                  <div className="font-extrabold text-rose-950 text-xs">Municipal Administrator</div>
+                  <div className="text-[10px] text-rose-700 font-semibold">Full System Oversight</div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

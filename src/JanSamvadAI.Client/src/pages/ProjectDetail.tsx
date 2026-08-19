@@ -1,519 +1,639 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import api from '../services/api'
-import { useAuth } from '../context/AuthContext'
-import { 
-  Building2, 
-  ArrowLeft, 
-  DollarSign, 
-  Calendar, 
-  CheckCircle2, 
-  Clock, 
-  AlertTriangle, 
-  Users, 
-  FileText, 
+import { useJanSamvad } from '../context/JanSamvadContext'
+import AccountabilityChain from '../components/AccountabilityChain'
+import CivicMap from '../components/CivicMap'
+import {
+  Building2,
+  ArrowLeft,
+  Calendar,
+  DollarSign,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
   Send,
-  CreditCard,
-  Briefcase,
-  Layers,
-  MapPin
+  PlusCircle,
+  Star,
+  ShieldAlert,
+  MessageSquareCheck,
+  TrendingUp,
+  MapPin,
+  Sparkles,
+  FileText,
+  Users,
+  ThumbsUp
 } from 'lucide-react'
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer
+} from 'recharts'
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>()
-  const { user } = useAuth()
+  const {
+    currentDistrict,
+    currentUser,
+    currentDistrictId,
+    rateProject,
+    addProjectLiveUpdate,
+    supportQuestion
+  } = useJanSamvad()
 
-  const [project, setProject] = useState<any>(null)
-  const [financials, setFinancials] = useState<any>(null)
-  const [contractors, setContractors] = useState<any[]>([])
-  const [milestones, setMilestones] = useState<any[]>([])
-  const [transactions, setTransactions] = useState<any[]>([])
-  const [delays, setDelays] = useState<any[]>([])
-  const [updates, setUpdates] = useState<any[]>([])
+  const project = currentDistrict.projects.find(p => p.id === id)
 
-  const [activeTab, setActiveTab] = useState<'financials' | 'milestones' | 'contractors'>('financials')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Local state for officer adding update
+  const [updateText, setUpdateText] = useState('')
+  const [newProgress, setNewProgress] = useState<number | ''>('')
+  const [showUpdateForm, setShowUpdateForm] = useState(false)
 
-  // New update form
-  const [updateDesc, setUpdateDesc] = useState('')
-  const [updateProgress, setUpdateProgress] = useState<number | ''>('')
-  const [postingUpdate, setPostingUpdate] = useState(false)
-  const [updateSuccess, setUpdateSuccess] = useState(false)
+  // Local state for citizen rating
+  const [citizenRating, setCitizenRating] = useState<number>(5)
+  const [citizenComment, setCitizenComment] = useState('')
+  const [hasRated, setHasRated] = useState(false)
 
-  const fetchAllDetails = async () => {
-    if (!id) return
-    setLoading(true)
-    setError(null)
-
-    try {
-      const [projRes, finRes, contRes, mlsRes, txRes, delRes, updRes] = await Promise.allSettled([
-        api.get(`/api/projects/${id}`),
-        api.get(`/api/projects/${id}/financial-summary`),
-        api.get(`/api/projects/${id}/contractors`),
-        api.get(`/api/projects/${id}/milestones`),
-        api.get(`/api/projects/${id}/transactions`),
-        api.get(`/api/projects/${id}/delays`),
-        api.get(`/api/projects/${id}/updates`)
-      ])
-
-      if (projRes.status === 'fulfilled' && projRes.value.data?.data) {
-        setProject(projRes.value.data.data)
-      } else {
-        throw new Error('Project not found')
-      }
-
-      if (finRes.status === 'fulfilled') setFinancials(finRes.value.data?.data)
-      if (contRes.status === 'fulfilled') setContractors(contRes.value.data?.data || [])
-      if (mlsRes.status === 'fulfilled') setMilestones(mlsRes.value.data?.data || [])
-      if (txRes.status === 'fulfilled') setTransactions(txRes.value.data?.data || [])
-      if (delRes.status === 'fulfilled') setDelays(delRes.value.data?.data || [])
-      if (updRes.status === 'fulfilled') setUpdates(updRes.value.data?.data || [])
-    } catch (e: any) {
-      setError(e?.message || 'Failed to load project details')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchAllDetails()
-  }, [id])
-
-  const handlePostUpdate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!id || !updateDesc.trim()) return
-
-    setPostingUpdate(true)
-    setUpdateSuccess(false)
-
-    try {
-      await api.post(`/api/projects/${id}/updates`, {
-        description: updateDesc,
-        progressPercentage: updateProgress !== '' ? Number(updateProgress) : undefined
-      })
-      setUpdateDesc('')
-      setUpdateProgress('')
-      setUpdateSuccess(true)
-      // refresh updates
-      const res = await api.get(`/api/projects/${id}/updates`)
-      if (res.data?.data) setUpdates(res.data.data)
-    } catch (err: any) {
-      alert(err?.response?.data?.message || 'Failed to post update')
-    } finally {
-      setPostingUpdate(false)
-    }
-  }
-
-  const formatCurrency = (val?: number) => {
-    if (val === undefined || val === null) return '₹0'
-    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val)
-  }
-
-  if (loading) {
+  if (!project) {
     return (
-      <div className="py-12 text-center text-slate-500">
-        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-        <p className="text-sm font-medium">Loading project intelligence...</p>
-      </div>
-    )
-  }
-
-  if (error || !project) {
-    return (
-      <div className="max-w-lg mx-auto py-12 text-center space-y-4">
-        <div className="p-4 bg-rose-50 text-rose-700 rounded-2xl border border-rose-200 text-sm">
-          {error || 'Project not found.'}
+      <div className="max-w-lg mx-auto py-16 text-center space-y-4">
+        <div className="p-6 bg-rose-50 border border-rose-200 text-rose-700 rounded-3xl text-sm">
+          Project record not found in {currentDistrict.name} district data.
         </div>
-        <Link to="/projects" className="inline-flex items-center gap-2 text-xs font-bold text-blue-600 hover:underline">
-          <ArrowLeft className="w-4 h-4" /> Back to all projects
+        <Link
+          to="/projects"
+          className="inline-flex items-center gap-2 text-xs font-bold text-blue-600 hover:underline"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to District Projects
         </Link>
       </div>
     )
+  }
+
+  // Related grievances on this project
+  const relatedGrievances = currentDistrict.grievances.filter(g => g.projectId === project.id)
+  const pendingGrievances = relatedGrievances.filter(g => g.status === 'Open').length
+  const inProgressGrievances = relatedGrievances.filter(g => g.status === 'InProgress').length
+  const resolvedGrievances = relatedGrievances.filter(g => g.status === 'Resolved').length
+
+  // Related opposition questions
+  const relatedQuestions = currentDistrict.oppositionQuestions.filter(q => q.projectId === project.id)
+
+  const handlePostUpdate = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!updateText.trim()) return
+
+    addProjectLiveUpdate(project.id, {
+      description: updateText.trim(),
+      progressPercentage: newProgress !== '' ? Number(newProgress) : undefined
+    })
+
+    setUpdateText('')
+    setNewProgress('')
+    setShowUpdateForm(false)
+  }
+
+  const handleRateSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!citizenComment.trim()) return
+
+    rateProject(project.id, citizenRating, citizenComment.trim())
+    setCitizenComment('')
+    setHasRated(true)
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Completed':
+        return (
+          <span className="bg-emerald-100 text-emerald-800 text-xs font-extrabold px-3 py-1 rounded-full flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4" /> Completed
+          </span>
+        )
+      case 'Delayed':
+        return (
+          <span className="bg-amber-100 text-amber-800 text-xs font-extrabold px-3 py-1 rounded-full flex items-center gap-1.5">
+            <AlertTriangle className="w-4 h-4" /> Delayed (Under Scrutiny)
+          </span>
+        )
+      case 'Planned':
+        return (
+          <span className="bg-purple-100 text-purple-800 text-xs font-extrabold px-3 py-1 rounded-full flex items-center gap-1.5">
+            <Clock className="w-4 h-4" /> Planned (Tendering Stage)
+          </span>
+        )
+      default:
+        return (
+          <span className="bg-blue-100 text-blue-800 text-xs font-extrabold px-3 py-1 rounded-full flex items-center gap-1.5">
+            <TrendingUp className="w-4 h-4" /> Ongoing Execution
+          </span>
+        )
+    }
   }
 
   return (
-    <div className="space-y-6 pb-16">
-      {/* Top Breadcrumb */}
+    <div className="space-y-6 pb-24 max-w-6xl mx-auto">
+      
+      {/* Top Breadcrumb / Back Navigation */}
       <div className="flex items-center justify-between">
-        <Link to="/projects" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-blue-600 transition">
+        <Link
+          to="/projects"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-blue-600 transition"
+        >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back to Projects</span>
+          <span>Back to {currentDistrict.name} Projects</span>
         </Link>
-        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-          Public Audit ID: #{project.id}
+        <span className="text-xs text-slate-400 font-mono">
+          Project ID: {project.id}
         </span>
       </div>
 
-      {/* Main Project Header Card */}
-      <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200/60 px-2.5 py-0.5 rounded-lg">
-                {project.departmentName || 'Public Works'}
+      {/* 1. Main Project Header Banner */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 md:p-8 space-y-6">
+        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
+          <div className="space-y-2 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 text-xs font-extrabold text-slate-700 bg-slate-100 px-3 py-1 rounded-xl">
+                <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                {project.sector}, {currentDistrict.name}
               </span>
-              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-lg ${
-                project.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' :
-                project.status === 'InProgress' ? 'bg-blue-100 text-blue-800' :
-                project.status === 'OnHold' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'
-              }`}>
-                {project.status}
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 bg-blue-50 px-3 py-1 rounded-xl">
+                <Building2 className="w-3.5 h-3.5" />
+                {project.department}
               </span>
+              {getStatusBadge(project.status)}
             </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900">
+
+            <h1 className="text-2xl md:text-3xl font-black text-slate-900 leading-tight">
               {project.name}
             </h1>
-            <p className="text-slate-600 text-sm max-w-3xl leading-relaxed">
-              {project.description}
+
+            <p className="text-slate-600 text-sm leading-relaxed max-w-3xl pt-1">
+              {project.whyExists}
             </p>
           </div>
 
-          {/* Progress Widget */}
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 min-w-[200px] text-right">
-            <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
-              Physical Progress
+          {/* Progress & Rating KPI Widget */}
+          <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white p-5 rounded-3xl shadow-md min-w-[240px] space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase font-black text-blue-300 tracking-wider">
+                Overall Progress
+              </span>
+              <span className="text-xl font-black text-white">
+                {project.progressPercentage}%
+              </span>
             </div>
-            <div className="text-3xl font-black text-slate-900">
-              {project.progressPercentage}%
-            </div>
-            <div className="w-full bg-slate-200 rounded-full h-2.5 mt-2 overflow-hidden">
+            
+            <div className="w-full bg-white/20 h-2.5 rounded-full overflow-hidden">
               <div
-                className="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(100, Math.max(0, project.progressPercentage))}%` }}
+                className="bg-blue-400 h-full rounded-full transition-all"
+                style={{ width: `${project.progressPercentage}%` }}
               />
             </div>
+
+            <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs">
+              <span className="text-slate-300">Citizen Rating</span>
+              <span className="font-bold text-amber-400 flex items-center gap-1">
+                <Star className="w-3.5 h-3.5 fill-amber-400" />
+                {project.averageRating > 0 ? `${project.averageRating} / 5.0` : 'Unrated'}
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Project Meta Info */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-slate-100 text-xs">
-          <div>
-            <span className="text-slate-400 font-medium block">Ward Locality</span>
-            <span className="font-bold text-slate-800 flex items-center gap-1 mt-0.5">
-              <MapPin className="w-3.5 h-3.5 text-blue-600" /> Ward #{project.wardId}
-            </span>
+        {/* Financial & Timeline Metrics Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-6 border-t border-slate-100">
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
+            <div className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
+              <DollarSign className="w-3 h-3 text-blue-600" /> Sanctioned Budget
+            </div>
+            <div className="text-lg font-black text-slate-900 mt-1">₹{project.budgetCr} Crore</div>
           </div>
-          <div>
-            <span className="text-slate-400 font-medium block">Created Date</span>
-            <span className="font-bold text-slate-800 mt-0.5 block">
-              {new Date(project.createdAt).toLocaleDateString()}
-            </span>
+
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
+            <div className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
+              <TrendingUp className="w-3 h-3 text-emerald-600" /> Current Expenditure
+            </div>
+            <div className="text-lg font-black text-slate-900 mt-1">₹{project.currentExpenditureCr} Crore</div>
           </div>
-          <div>
-            <span className="text-slate-400 font-medium block">Data Integrity</span>
-            <span className="font-bold text-slate-800 mt-0.5 block">
-              {project.dataSource} (Verified)
-            </span>
+
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
+            <div className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
+              <Calendar className="w-3 h-3 text-purple-600" /> Start Date
+            </div>
+            <div className="text-sm font-bold text-slate-800 mt-1.5">{project.startDate}</div>
           </div>
-          <div>
-            <span className="text-slate-400 font-medium block">Total Transactions</span>
-            <span className="font-bold text-blue-600 mt-0.5 block">
-              {transactions.length} Disbursements
-            </span>
+
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
+            <div className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
+              <Clock className="w-3 h-3 text-amber-600" /> Target Completion
+            </div>
+            <div className="text-sm font-bold text-slate-800 mt-1.5">{project.expectedCompletion}</div>
           </div>
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="flex border-b border-slate-200 gap-2">
-        <button
-          onClick={() => setActiveTab('financials')}
-          className={`pb-3 px-4 text-sm font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
-            activeTab === 'financials'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <CreditCard className="w-4 h-4" />
-          <span>Financial Transparency & Ledger</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('milestones')}
-          className={`pb-3 px-4 text-sm font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
-            activeTab === 'milestones'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Clock className="w-4 h-4" />
-          <span>Milestones & Delays</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('contractors')}
-          className={`pb-3 px-4 text-sm font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
-            activeTab === 'contractors'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>Contractors & Field Updates</span>
-        </button>
-      </div>
-
-      {/* Tab 1: Financial Transparency */}
-      {activeTab === 'financials' && (
-        <div className="space-y-6">
-          {/* Financial KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Sanctioned Amount</span>
-              <div className="text-2xl font-extrabold text-slate-900 mt-1">
-                {formatCurrency(financials?.sanctionedAmount)}
+      {/* 2. Main Two-Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Left 2 Columns: Live Updates, History Chart, Grievances, Feedback */}
+        <div className="lg:col-span-2 space-y-6">
+          
+          {/* A. Live Project Updates Stream */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-blue-600" />
+                <h3 className="font-extrabold text-slate-900 text-base">
+                  Latest Project Progress Updates
+                </h3>
               </div>
-              <span className="text-[11px] text-slate-500 mt-1 block">Government approved ceiling</span>
-            </div>
 
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Contract Amount</span>
-              <div className="text-2xl font-extrabold text-slate-900 mt-1">
-                {formatCurrency(financials?.contractAmount)}
-              </div>
-              <span className="text-[11px] text-slate-500 mt-1 block">Awarded tender value</span>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Disbursed (Spent)</span>
-              <div className="text-2xl font-extrabold text-blue-600 mt-1">
-                {formatCurrency(financials?.totalDisbursedAmount)}
-              </div>
-              <span className="text-[11px] text-emerald-600 font-semibold mt-1 block">
-                {financials?.utilizationPercentage}% fund utilization
-              </span>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Remaining Balance</span>
-              <div className="text-2xl font-extrabold text-slate-900 mt-1">
-                {formatCurrency(financials?.remainingAmount)}
-              </div>
-              <span className="text-[11px] text-slate-500 mt-1 block">Pending milestones release</span>
-            </div>
-          </div>
-
-          {/* Transactions Ledger Table */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-slate-900 text-base">Financial Disbursement Ledger</h3>
-                <p className="text-xs text-slate-500">Every verified milestone payout and contractor invoice</p>
-              </div>
-              <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-lg">
-                {transactions.length} Records
-              </span>
-            </div>
-
-            {transactions.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 text-xs">No transactions recorded yet.</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200/80">
-                    <tr>
-                      <th className="py-3 px-4">Date</th>
-                      <th className="py-3 px-4">Reference #</th>
-                      <th className="py-3 px-4">Type</th>
-                      <th className="py-3 px-4">Description</th>
-                      <th className="py-3 px-4 text-right">Disbursed Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {transactions.map(tx => (
-                      <tr key={tx.id} className="hover:bg-slate-50/80 transition">
-                        <td className="py-3 px-4 text-xs font-medium text-slate-600">{tx.transactionDate}</td>
-                        <td className="py-3 px-4 text-xs font-mono text-blue-600 font-bold">{tx.referenceNumber || `TX-${tx.id}`}</td>
-                        <td className="py-3 px-4 text-xs">
-                          <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-medium">
-                            {tx.transactionType}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-xs text-slate-600">{tx.description}</td>
-                        <td className="py-3 px-4 text-xs font-bold text-slate-900 text-right">
-                          {formatCurrency(tx.amount)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Tab 2: Milestones & Delays */}
-      {activeTab === 'milestones' && (
-        <div className="space-y-6">
-          {/* Milestones List */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-            <h3 className="font-bold text-slate-900 text-base mb-4">Project Milestones Timeline</h3>
-            <div className="space-y-4">
-              {milestones.length === 0 ? (
-                <div className="text-xs text-slate-400">No milestones configured.</div>
-              ) : (
-                milestones.map((m, idx) => (
-                  <div key={m.id || idx} className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center">
-                          {idx + 1}
-                        </span>
-                        <h4 className="font-bold text-slate-900 text-sm">{m.name}</h4>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-700">
-                          {m.status}
-                        </span>
-                      </div>
-                      <div className="text-xs text-slate-500 pl-8">
-                        Planned Date: {m.plannedDate || 'N/A'} {m.actualDate && `• Actual Date: ${m.actualDate}`}
-                      </div>
-                    </div>
-
-                    <div className="sm:w-48 pl-8 sm:pl-0">
-                      <div className="flex justify-between text-xs font-semibold mb-1">
-                        <span className="text-slate-500">Progress</span>
-                        <span className="text-slate-800">{m.completionPercentage}%</span>
-                      </div>
-                      <div className="w-full bg-slate-200 rounded-full h-2">
-                        <div
-                          className="bg-emerald-500 h-2 rounded-full"
-                          style={{ width: `${Math.min(100, Math.max(0, m.completionPercentage))}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))
+              {/* Officer trigger to add update */}
+              {(currentUser?.role === 'officer' || currentUser?.role === 'admin') && (
+                <button
+                  onClick={() => setShowUpdateForm(!showUpdateForm)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition cursor-pointer"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>{showUpdateForm ? 'Cancel' : 'Post Progress Update'}</span>
+                </button>
               )}
             </div>
-          </div>
 
-          {/* Delay Records */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-            <h3 className="font-bold text-slate-900 text-base mb-2 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-500" />
-              Official Delay Logs & Obstructions
-            </h3>
-            {delays.length === 0 ? (
-              <p className="text-xs text-slate-500">No formal delays recorded for this project.</p>
+            {/* Officer Post Update Form */}
+            {showUpdateForm && (
+              <form onSubmit={handlePostUpdate} className="p-4 rounded-2xl bg-blue-50 border border-blue-200 space-y-3">
+                <div className="font-bold text-xs text-blue-900">
+                  Officer Field Update & Milestone Entry
+                </div>
+                <textarea
+                  required
+                  rows={3}
+                  value={updateText}
+                  onChange={e => setUpdateText(e.target.value)}
+                  placeholder="Describe technical work completed, quality inspection results, or phase handover..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-blue-300 text-xs focus:ring-2 focus:ring-blue-200 outline-none resize-none"
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-semibold text-slate-700">Update Progress %:</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={newProgress}
+                      onChange={e => setNewProgress(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder={String(project.progressPercentage)}
+                      className="w-20 px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-center"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition"
+                  >
+                    Publish to Feed
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Updates list */}
+            {project.liveUpdates.length === 0 ? (
+              <div className="p-6 text-center text-xs text-slate-400 italic">
+                No official milestone updates recorded yet for this project.
+              </div>
             ) : (
-              <div className="divide-y divide-slate-100">
-                {delays.map(d => (
-                  <div key={d.id} className="py-3 text-xs">
-                    <div className="flex items-center justify-between font-bold text-slate-800">
-                      <span>Reason: {d.reason}</span>
-                      <span className="text-rose-600 bg-rose-50 px-2 py-0.5 rounded">
-                        +{d.delayDays} days delay
-                      </span>
+              <div className="relative border-l-2 border-slate-200 ml-3 pl-4 space-y-4 py-1">
+                {project.liveUpdates.map(u => (
+                  <div key={u.id} className="relative group">
+                    <div className="absolute -left-[23px] top-1.5 w-3 h-3 rounded-full bg-blue-600 border-2 border-white shadow-2xs" />
+                    <div className="text-xs text-slate-400 font-semibold">{u.date}</div>
+                    <p className="text-xs md:text-sm text-slate-800 font-medium mt-0.5 leading-relaxed">
+                      {u.description}
+                    </p>
+                    <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-2">
+                      <span className="font-semibold text-slate-700">{u.author}</span>
+                      {u.progressPercentage !== undefined && (
+                        <span className="font-extrabold text-blue-600 bg-blue-50 px-2 py-0.2 rounded">
+                          Progress: {u.progressPercentage}%
+                        </span>
+                      )}
                     </div>
-                    <p className="text-slate-500 mt-1">{d.description}</p>
-                    <span className="text-[10px] text-slate-400 mt-1 block">Reported by: {d.reportedByName}</span>
                   </div>
                 ))}
               </div>
             )}
           </div>
-        </div>
-      )}
 
-      {/* Tab 3: Contractors & Updates */}
-      {activeTab === 'contractors' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Contractors Info */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-              <Briefcase className="w-4 h-4 text-blue-600" />
-              Assigned Contractors
-            </h3>
-            {contractors.length === 0 ? (
-              <p className="text-xs text-slate-500">No contractor details assigned.</p>
+          {/* B. Progress History Recharts Chart */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-emerald-600" />
+                Physical Progress Trend
+              </h3>
+              <span className="text-xs text-slate-500 font-medium">Monthly Milestones</span>
+            </div>
+
+            <div className="h-48 w-full pt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={project.progressHistory}>
+                  <defs>
+                    <linearGradient id="progressGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" />
+                  <Tooltip
+                    formatter={(val: number) => [`${val}%`, 'Progress']}
+                    contentStyle={{ borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="progressPercentage"
+                    stroke="#2563eb"
+                    strokeWidth={3}
+                    fillOpacity={1}
+                    fill="url(#progressGrad)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* C. Related Citizen Grievances */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MessageSquareCheck className="w-5 h-5 text-sky-600" />
+                <h3 className="font-extrabold text-slate-900 text-base">
+                  Citizen Issues on this Project ({relatedGrievances.length})
+                </h3>
+              </div>
+
+              <Link
+                to={`/complaints/new?projectId=${project.id}&sector=${encodeURIComponent(
+                  project.sector
+                )}&title=${encodeURIComponent(`Issue regarding ${project.name}`)}`}
+                className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-200 transition"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>File Grievance on this</span>
+              </Link>
+            </div>
+
+            {/* Grievance Summary Counters */}
+            <div className="grid grid-cols-4 gap-2 text-center text-xs">
+              <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="text-slate-400 text-[10px] uppercase font-bold">Total</div>
+                <div className="font-black text-slate-900 text-base">{relatedGrievances.length}</div>
+              </div>
+              <div className="p-2 rounded-xl bg-rose-50 border border-rose-100">
+                <div className="text-rose-500 text-[10px] uppercase font-bold">Pending</div>
+                <div className="font-black text-rose-700 text-base">{pendingGrievances}</div>
+              </div>
+              <div className="p-2 rounded-xl bg-amber-50 border border-amber-100">
+                <div className="text-amber-600 text-[10px] uppercase font-bold">In Progress</div>
+                <div className="font-black text-amber-700 text-base">{inProgressGrievances}</div>
+              </div>
+              <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-100">
+                <div className="text-emerald-600 text-[10px] uppercase font-bold">Resolved</div>
+                <div className="font-black text-emerald-700 text-base">{resolvedGrievances}</div>
+              </div>
+            </div>
+
+            {/* List of related complaints */}
+            {relatedGrievances.length === 0 ? (
+              <div className="p-6 text-center text-xs text-slate-400 italic">
+                No citizen grievances reported on this project yet.
+              </div>
             ) : (
-              contractors.map(c => (
-                <div key={c.contractorId} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-slate-900 text-sm">{c.companyName}</h4>
-                    <span className="text-[10px] font-bold uppercase bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                      {c.contractorRole}
+              <div className="space-y-2 pt-2">
+                {relatedGrievances.map(g => (
+                  <Link
+                    key={g.id}
+                    to={`/complaints/${g.id}`}
+                    className="p-3.5 rounded-2xl border border-slate-200/80 hover:border-blue-300 hover:bg-slate-50 transition flex items-center justify-between gap-3 text-xs block"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-bold text-slate-900 truncate">{g.title}</div>
+                      <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                        <span className="font-mono">{g.complaintNumber}</span>
+                        <span>&bull;</span>
+                        <span>Filed: {g.createdAt}</span>
+                      </div>
+                    </div>
+                    <span
+                      className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full flex-shrink-0 ${
+                        g.status === 'Resolved'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : g.status === 'InProgress'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-rose-100 text-rose-800'
+                      }`}
+                    >
+                      {g.status}
                     </span>
-                  </div>
-                  <div className="text-xs text-slate-600 space-y-1">
-                    <div>Reg #: <span className="font-mono text-slate-800 font-semibold">{c.registrationNumber}</span></div>
-                    <div>Contact: <span className="text-slate-800">{c.contactInformation || 'N/A'}</span></div>
-                    <div>Address: <span className="text-slate-800">{c.address || 'District Registered'}</span></div>
-                  </div>
-                </div>
-              ))
+                  </Link>
+                ))}
+              </div>
             )}
           </div>
 
-          {/* Project Updates Feed & Post update form */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-              <FileText className="w-4 h-4 text-indigo-600" />
-              Official Field Reports & Updates
-            </h3>
+          {/* D. Opposition Scrutiny Questions */}
+          {relatedQuestions.length > 0 && (
+            <div className="bg-amber-50/70 rounded-3xl border border-amber-200 p-6 shadow-2xs space-y-3">
+              <div className="flex items-center gap-2 text-amber-900">
+                <ShieldAlert className="w-5 h-5 text-amber-600" />
+                <h3 className="font-extrabold text-base">
+                  Opposition Scrutiny Inquiries ({relatedQuestions.length})
+                </h3>
+              </div>
 
-            {/* Post update form if authenticated */}
-            {user && (
-              <form onSubmit={handlePostUpdate} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-                <div className="text-xs font-bold text-slate-700">Submit Project Progress Report</div>
+              <div className="space-y-3 pt-1">
+                {relatedQuestions.map(q => (
+                  <div key={q.id} className="p-4 rounded-2xl bg-white border border-amber-200 shadow-2xs space-y-2 text-xs">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="font-bold text-slate-900 text-sm">{q.questionText}</div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          {q.raisedBy} &bull; {q.raisedDate}
+                        </div>
+                      </div>
+                      <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold text-[10px]">
+                        {q.claimCategory}
+                      </span>
+                    </div>
+
+                    {q.govResponseText ? (
+                      <div className="mt-2 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 space-y-1">
+                        <div className="text-[10px] font-extrabold uppercase text-emerald-700">
+                          Official Department Response ({q.responseOfficerName})
+                        </div>
+                        <p className="text-xs leading-relaxed">{q.govResponseText}</p>
+                      </div>
+                    ) : (
+                      <div className="text-slate-400 italic text-[11px]">
+                        Pending official government response.
+                      </div>
+                    )}
+
+                    <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                      <button
+                        onClick={() => supportQuestion(q.id)}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 hover:text-amber-950"
+                      >
+                        <ThumbsUp className="w-3 h-3 text-amber-600" />
+                        <span>{q.citizenSupports} Citizens Support This Inquiry</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* E. Citizen Feedback & Rating */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Star className="w-5 h-5 text-amber-500 fill-amber-400" />
+                <h3 className="font-extrabold text-slate-900 text-base">
+                  Citizen Ratings & Reviews ({project.ratings.length})
+                </h3>
+              </div>
+              <div className="font-black text-slate-900 text-base">
+                {project.averageRating > 0 ? `${project.averageRating} / 5.0` : 'New'}
+              </div>
+            </div>
+
+            {/* Citizen rate form */}
+            {!hasRated ? (
+              <form onSubmit={handleRateSubmit} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="text-xs font-bold text-slate-800">
+                  Rate this public project in your area:
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setCitizenRating(star)}
+                      className="p-1 hover:scale-110 transition cursor-pointer"
+                    >
+                      <Star
+                        className={`w-6 h-6 ${
+                          star <= citizenRating
+                            ? 'text-amber-500 fill-amber-400'
+                            : 'text-slate-300'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                  <span className="text-xs font-bold text-slate-700 ml-2">
+                    {citizenRating} of 5 Stars
+                  </span>
+                </div>
+
                 <textarea
                   required
                   rows={2}
-                  value={updateDesc}
-                  onChange={e => setUpdateDesc(e.target.value)}
-                  placeholder="Enter milestone completion notes, inspection findings..."
-                  className="w-full p-2.5 rounded-lg border border-slate-300 text-xs focus:border-blue-600 outline-none"
+                  value={citizenComment}
+                  onChange={e => setCitizenComment(e.target.value)}
+                  placeholder="Share your experience regarding work speed, quality, or local neighborhood impact..."
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-300 focus:border-blue-600 outline-none resize-none"
                 />
-                <div className="flex items-center justify-between gap-3">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={updateProgress}
-                    onChange={e => setUpdateProgress(e.target.value === '' ? '' : Number(e.target.value))}
-                    placeholder="New progress % (e.g. 75)"
-                    className="p-2 rounded-lg border border-slate-300 text-xs w-36"
-                  />
-                  <button
-                    type="submit"
-                    disabled={postingUpdate}
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-1 cursor-pointer"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>{postingUpdate ? 'Posting...' : 'Post Update'}</span>
-                  </button>
-                </div>
-                {updateSuccess && (
-                  <div className="text-xs text-emerald-600 font-semibold">Report published successfully!</div>
-                )}
+
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition"
+                >
+                  Submit Citizen Review
+                </button>
               </form>
+            ) : (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-bold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                Thank you! Your feedback has been recorded in the public accountability ledger.
+              </div>
             )}
 
-            <div className="space-y-3 divide-y divide-slate-100 max-h-96 overflow-y-auto pr-1">
-              {updates.length === 0 ? (
-                <p className="text-xs text-slate-500">No field updates posted yet.</p>
-              ) : (
-                updates.map(u => (
-                  <div key={u.id} className="pt-3 text-xs space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-800">{u.authorName}</span>
-                      <span className="text-[10px] text-slate-400">{new Date(u.updateDate || u.createdAt).toLocaleDateString()}</span>
+            {/* List of existing ratings */}
+            <div className="space-y-2.5 pt-2">
+              {project.ratings.map(r => (
+                <div
+                  key={r.id}
+                  className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 text-xs space-y-1"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      {r.citizenName}
+                    </span>
+                    <div className="flex items-center gap-1 text-amber-500 font-bold">
+                      <Star className="w-3.5 h-3.5 fill-amber-400" />
+                      <span>{r.rating}.0</span>
                     </div>
-                    <p className="text-slate-600">{u.description}</p>
-                    {u.progressPercentage !== null && (
-                      <span className="inline-block bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded text-[10px]">
-                        Progress: {u.progressPercentage}%
-                      </span>
-                    )}
                   </div>
-                ))
-              )}
+                  <p className="text-slate-700 leading-relaxed">{r.comment}</p>
+                  <div className="text-[10px] text-slate-400">{r.date}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-      )}
+
+        {/* Right 1 Column: Accountability Chain & Geospatial Pin */}
+        <div className="space-y-6">
+          
+          {/* Full Accountability Chain */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-2xs">
+            <AccountabilityChain accountability={project.accountability} />
+          </div>
+
+          {/* Project Location Geospatial Map */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                <MapPin className="w-4 h-4 text-rose-500" />
+                Geospatial Pinpoint
+              </h3>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {project.coordinates.join(', ')}
+              </span>
+            </div>
+
+            <CivicMap
+              projects={[project]}
+              districtId={currentDistrictId}
+              height="220px"
+              selectedProjectId={project.id}
+              center={project.coordinates}
+              zoom={14}
+              interactive={true}
+            />
+
+            <div className="text-[11px] text-slate-500 font-medium">
+              📍 Exact municipal site coordinates in {project.sector}, {currentDistrict.name}.
+            </div>
+          </div>
+
+          {/* Expected Outcome */}
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 rounded-3xl border border-blue-200 p-6 shadow-2xs space-y-2">
+            <div className="text-[10px] uppercase font-black tracking-wider text-blue-600 flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Expected Civic Outcome
+            </div>
+            <p className="text-xs text-slate-800 leading-relaxed font-medium">
+              {project.expectedOutcome}
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
