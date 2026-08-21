@@ -42,7 +42,7 @@
 
 ---
 
-## 🚀 Getting Started & Setup Guide
+##  Getting Started & Setup Guide
 
 ### 🐳 Quick Start with Docker (Zero Dependencies Required - Recommended)
 
