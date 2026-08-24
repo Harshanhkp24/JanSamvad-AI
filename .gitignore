@@ -1,0 +1,123 @@
+# ==============================================================================
+# JanSamvad-AI Comprehensive .gitignore
+# Covering: .NET 8/9 C#, Python / FastAPI AI, Node / React / Vite Client, & OS
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Operating System & IDE Files
+# ------------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# Visual Studio & VS Code
+.vs/
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+*.DotSettings.user
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# ------------------------------------------------------------------------------
+# .NET / C# Build Outputs & Cache
+# ------------------------------------------------------------------------------
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+[Tt]est[Rr]esult*/
+[Tt]est[Rr]esults/
+*.pdb
+*.cache
+*.docstates
+*.nupkg
+*.snupkg
+*.suo
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# ASP.NET / IIS Express / App Data
+App_Data/
+_ReSharper*/
+*.ReSharper
+
+# ------------------------------------------------------------------------------
+# Node.js / React / Vite (Client)
+# ------------------------------------------------------------------------------
+node_modules/
+dist/
+dist-ssr/
+build/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.eslintcache
+.stylelintcache
+.turbo/
+.parcel-cache/
+
+# ------------------------------------------------------------------------------
+# Python & AI / NLP Service
+# ------------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+env.bak/
+venv.bak/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+*.ipynb_checkpoints
+
+# ------------------------------------------------------------------------------
+# Environment Variables & Secrets
+# ------------------------------------------------------------------------------
+.env
+.env*.local
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+appsettings.Production.json
+secrets.json
