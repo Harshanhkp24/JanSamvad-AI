@@ -1,0 +1,21 @@
+[
+  {"text": "Large potholes on the main road near the flyover are damaging vehicles.", "category": "ROAD_DAMAGE"},
+  {"text": "सड़क पर बड़ा गड्ढा है और डामर उखड़ गया है।", "category": "ROAD_DAMAGE"},
+  {"text": "Broken pavement and damaged speed breaker causing accidents.", "category": "ROAD_DAMAGE"},
+  {"text": "No drinking water supply in our ward for three days.", "category": "WATER_SUPPLY"},
+  {"text": "पानी की पाइपलाइन लीक हो रही है और दबाव बहुत कम है।", "category": "WATER_SUPPLY"},
+  {"text": "Contaminated tap water and irregular tanker supply.", "category": "WATER_SUPPLY"},
+  {"text": "Power cut since last night, transformer sparking near the colony.", "category": "ELECTRICITY"},
+  {"text": "बिजली का तार टूटा हुआ है और वोल्टेज बहुत कम है।", "category": "ELECTRICITY"},
+  {"text": "Street light on the dark road has not worked for a week.", "category": "STREET_LIGHT"},
+  {"text": "स्ट्रीट लाइट खराब है और रास्ता रात में अंधेरा रहता है।", "category": "STREET_LIGHT"},
+  {"text": "Overflowing drain and clogged sewer causing waterlogging.", "category": "DRAINAGE"},
+  {"text": "नाला जाम है और सीवर ओवरफ्लो हो रहा है।", "category": "DRAINAGE"},
+  {"text": "Garbage not collected, dump near the park smells badly.", "category": "SANITATION"},
+  {"text": "कचरा कई दिनों से नहीं उठाया गया, कूड़ादान भरा हुआ है।", "category": "SANITATION"},
+  {"text": "Open landfill and no recycle bins in the market.", "category": "WASTE_MANAGEMENT"},
+  {"text": "Primary health center has no doctor or medicines.", "category": "HEALTHCARE"},
+  {"text": "अस्पताल में एम्बुलेंस उपलब्ध नहीं है।", "category": "HEALTHCARE"},
+  {"text": "Government school classrooms have broken desks and no midday meal.", "category": "EDUCATION"},
+  {"text": "स्कूल में शिक्षक नहीं आ रहे और किताबें नहीं मिलीं।", "category": "EDUCATION"}
+]

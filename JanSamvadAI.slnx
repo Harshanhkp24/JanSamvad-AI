@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/JanSamvadAI.Api/JanSamvadAI.Api.csproj" />
+  </Folder>
+</Solution>
