@@ -13,7 +13,7 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", "Write-Host 'Start
 
 # 3. Start Python AI NLP service
 Write-Host "[3/3] Launching AI NLP Service (Port 8001)..." -ForegroundColor Green
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "Write-Host 'Starting JanSamvad AI NLP Service...' -ForegroundColor Cyan; cd '$PSScriptRoot/src/JanSamvadAI.AI'; if (Test-Path .\venv\Scripts\Activate.ps1) { .\venv\Scripts\Activate.ps1 }; uvicorn main:app --reload --port 8001"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "Write-Host 'Starting JanSamvad AI NLP Service...' -ForegroundColor Cyan; cd '$PSScriptRoot/src/JanSamvadAI.AI'; if (Test-Path .\venv\Scripts\uvicorn.exe) { .\venv\Scripts\uvicorn.exe main:app --reload --port 8001 } else { uvicorn main:app --reload --port 8001 }"
 
 Write-Host "`nAll services launched in separate windows!" -ForegroundColor Yellow
 Write-Host "👉 Frontend: http://localhost:5173" -ForegroundColor White
