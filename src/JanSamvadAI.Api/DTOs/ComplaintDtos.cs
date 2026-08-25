@@ -81,6 +81,7 @@ namespace JanSamvadAI.Api.DTOs
         public List<ComplaintHistoryDto> History { get; set; } = new();
         public List<AiClassificationDto> AiClassifications { get; set; } = new();
         public List<FeedbackDto> Feedback { get; set; } = new();
+        public List<ComplaintRelationshipDto> PotentialDuplicates { get; set; } = new();
     }
 
     public class ComplaintCreateDto
@@ -134,5 +135,34 @@ namespace JanSamvadAI.Api.DTOs
         public string? Description { get; set; }
         public int? DefaultDepartmentId { get; set; }
         public string? DefaultDepartmentName { get; set; }
+    }
+
+    public class ComplaintRelationshipDto
+    {
+        public int Id { get; set; }
+        public int ComplaintId1 { get; set; }
+        public string ComplaintNumber1 { get; set; } = string.Empty;
+        public string Title1 { get; set; } = string.Empty;
+        public int ComplaintId2 { get; set; }
+        public string ComplaintNumber2 { get; set; } = string.Empty;
+        public string Title2 { get; set; } = string.Empty;
+        public string RelationshipType { get; set; } = string.Empty;
+        public decimal SimilarityScore { get; set; }
+        public string? VerifiedById { get; set; }
+        public string? VerifiedByName { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class VerifyRelationshipRequest
+    {
+        [Required]
+        public bool IsDuplicate { get; set; }
+        public string? Remarks { get; set; }
+    }
+
+    public class AssistantMessageRequest
+    {
+        [Required]
+        public string Message { get; set; } = string.Empty;
     }
 }

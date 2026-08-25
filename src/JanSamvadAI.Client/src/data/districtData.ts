@@ -702,7 +702,19 @@ export const INITIAL_DATA: Record<DistrictId, DistrictDataSet> = {
         projectName: 'Water Supply Pipeline Expansion',
         locationDetails: 'House No. 142, Block B, Sector 15',
         aiDepartmentConfidence: 94,
-        resolutionRemarks: 'Assigned to AE Anita Sharma. Booster valve adjustment scheduled for today.'
+        resolutionRemarks: 'Assigned to AE Anita Sharma. Booster valve adjustment scheduled for today.',
+        potentialDuplicates: [
+          {
+            id: 'rel-fbd-water-01',
+            complaintId1: 'grv-fbd-01',
+            complaintNumber1: 'GRV-FBD-1024',
+            title1: 'Low Water Pressure in Residential Area — Sector 15',
+            complaintId2: 'grv-fbd-06',
+            complaintNumber2: 'GRV-FBD-1029',
+            title2: 'Low Water Pressure in Block B — Sector 15',
+            similarityScore: 0.872
+          }
+        ]
       },
       {
         id: 'grv-fbd-02',
@@ -784,6 +796,36 @@ export const INITIAL_DATA: Record<DistrictId, DistrictDataSet> = {
         feedbackRating: 4,
         feedbackComment: 'The broken swing was replaced with a new safety swing.',
         resolutionRemarks: 'Replaced under ongoing park renovation contract.'
+      },
+      {
+        id: 'grv-fbd-06',
+        complaintNumber: 'GRV-FBD-1029',
+        districtId: 'faridabad',
+        sector: 'Sector 15',
+        title: 'Low Water Pressure in Block B — Sector 15',
+        description: 'Very low water pressure in Block B flats on 2nd floor during morning hours. Same issue as nearby pipeline work area.',
+        category: 'WATER_SUPPLY',
+        department: 'Water Supply Department',
+        priority: 'High',
+        status: 'Open',
+        createdAt: '20 August 2026',
+        citizenName: 'Priya Mehta',
+        projectId: 'proj-fbd-01',
+        projectName: 'Water Supply Pipeline Expansion',
+        locationDetails: 'Block B, Flat 204, Sector 15',
+        aiDepartmentConfidence: 93,
+        potentialDuplicates: [
+          {
+            id: 'rel-fbd-water-01',
+            complaintId1: 'grv-fbd-01',
+            complaintNumber1: 'GRV-FBD-1024',
+            title1: 'Low Water Pressure in Residential Area — Sector 15',
+            complaintId2: 'grv-fbd-06',
+            complaintNumber2: 'GRV-FBD-1029',
+            title2: 'Low Water Pressure in Block B — Sector 15',
+            similarityScore: 0.872
+          }
+        ]
       }
     ],
     oppositionQuestions: [

@@ -11,12 +11,13 @@ import NewComplaint from './pages/NewComplaint'
 import Accountability from './pages/Accountability'
 import Scrutiny from './pages/Scrutiny'
 import NavBar from './components/NavBar'
+import AiAssistantWidget from './components/AiAssistantWidget'
 import { ShieldCheck, Heart, Landmark } from 'lucide-react'
 
 export default function App() {
   return (
     <JanSamvadProvider>
-      <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-sans antialiased selection:bg-blue-600 selection:text-white">
+      <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-sans antialiased selection:bg-blue-600 selection:text-white relative">
         <NavBar />
         <main className="flex-1 container mx-auto px-4 py-6 md:py-8">
           <Routes>
@@ -47,6 +48,7 @@ export default function App() {
             </div>
           </div>
         </footer>
+        <AiAssistantWidget />
       </div>
     </JanSamvadProvider>
   )

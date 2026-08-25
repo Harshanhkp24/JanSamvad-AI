@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -39,9 +41,134 @@ namespace JanSamvadAI.Api.Services
         public string ModelVersion { get; set; } = "heuristic-internal";
     }
 
+    public class DuplicateMatchDto
+    {
+        [JsonPropertyName("index")]
+        public int Index { get; set; }
+
+        [JsonPropertyName("text")]
+        public string Text { get; set; } = string.Empty;
+
+        [JsonPropertyName("similarity")]
+        public decimal Similarity { get; set; }
+    }
+
+    public class DuplicateCheckResponse
+    {
+        [JsonPropertyName("is_potential_duplicate")]
+        public bool IsPotentialDuplicate { get; set; }
+
+        [JsonPropertyName("matches")]
+        public List<DuplicateMatchDto> Matches { get; set; } = new();
+    }
+
+    public class ComplaintTextDto
+    {
+        public int Id { get; set; }
+        public string Text { get; set; } = string.Empty;
+    }
+
+    public class ComplaintTrendInputDto
+    {
+        public int Id { get; set; }
+        public string Region { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public string CreatedAt { get; set; } = string.Empty;
+    }
+
+    public class ProjectContextDto
+    {
+        [JsonPropertyName("id")]
+        public int Id { get; set; }
+        [JsonPropertyName("name")]
+        public string Name { get; set; } = string.Empty;
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = string.Empty;
+        [JsonPropertyName("budget_cr")]
+        public decimal BudgetCr { get; set; }
+        [JsonPropertyName("department")]
+        public string Department { get; set; } = string.Empty;
+        [JsonPropertyName("location")]
+        public string Location { get; set; } = string.Empty;
+    }
+
+    public class ComplaintContextDto
+    {
+        [JsonPropertyName("id")]
+        public int Id { get; set; }
+        [JsonPropertyName("complaint_number")]
+        public string ComplaintNumber { get; set; } = string.Empty;
+        [JsonPropertyName("title")]
+        public string Title { get; set; } = string.Empty;
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = string.Empty;
+        [JsonPropertyName("priority")]
+        public string Priority { get; set; } = string.Empty;
+        [JsonPropertyName("category")]
+        public string Category { get; set; } = string.Empty;
+    }
+
+    public class AssistantReplyResponse
+    {
+        [JsonPropertyName("reply")]
+        public string Reply { get; set; } = string.Empty;
+        [JsonPropertyName("service")]
+        public string Service { get; set; } = string.Empty;
+    }
+
+    public class RegionalInsightsResponse
+    {
+        [JsonPropertyName("total_complaints_analyzed")]
+        public int TotalComplaintsAnalyzed { get; set; }
+
+        [JsonPropertyName("top_regions")]
+        public List<TopRegionDto> TopRegions { get; set; } = new();
+
+        [JsonPropertyName("trends")]
+        public List<TrendPeriodDto> Trends { get; set; } = new();
+
+        [JsonPropertyName("insights")]
+        public List<InsightDto> Insights { get; set; } = new();
+    }
+
+    public class TopRegionDto
+    {
+        [JsonPropertyName("region")]
+        public string Region { get; set; } = string.Empty;
+        [JsonPropertyName("count")]
+        public int Count { get; set; }
+        [JsonPropertyName("primary_category")]
+        public string PrimaryCategory { get; set; } = string.Empty;
+    }
+
+    public class TrendPeriodDto
+    {
+        [JsonPropertyName("period")]
+        public string Period { get; set; } = string.Empty;
+        [JsonPropertyName("count")]
+        public int Count { get; set; }
+    }
+
+    public class InsightDto
+    {
+        [JsonPropertyName("region")]
+        public string Region { get; set; } = string.Empty;
+        [JsonPropertyName("category")]
+        public string Category { get; set; } = string.Empty;
+        [JsonPropertyName("type")]
+        public string Type { get; set; } = string.Empty;
+        [JsonPropertyName("description")]
+        public string Description { get; set; } = string.Empty;
+    }
+
     public interface IAiClassificationService
     {
         Task<AiClassificationResult> ClassifyComplaintAsync(string title, string description);
+        Task<List<DuplicateMatchDto>> DetectDuplicatesAsync(string newText, List<string> existingTexts, decimal threshold = 0.65m);
+        Task<RegionalInsightsResponse?> GetRegionalInsightsAsync(List<ComplaintTrendInputDto> complaints);
+        Task<string> GetAssistantReplyAsync(string message, List<ProjectContextDto> projects, List<ComplaintContextDto> complaints);
+        Task<JsonElement?> ClusterSimilarAsync(IEnumerable<object> items, decimal threshold = 0.70m);
+        Task<JsonElement?> EvaluateClassifierAsync();
     }
 
     public class AiClassificationService : IAiClassificationService
@@ -67,7 +194,7 @@ namespace JanSamvadAI.Api.Services
             try
             {
                 var requestUri = $"{_aiServiceUrl}/ai/classify";
-                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(2));
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(12));
                 var response = await _httpClient.PostAsJsonAsync(requestUri, new { text = combinedText }, cts.Token);
                 if (response.IsSuccessStatusCode)
                 {
@@ -123,6 +250,128 @@ namespace JanSamvadAI.Api.Services
                 ConfidenceScore = aiResponse.Confidence,
                 ModelVersion = aiResponse.ModelVersion ?? "heuristic-internal"
             };
+        }
+
+        public async Task<List<DuplicateMatchDto>> DetectDuplicatesAsync(string newText, List<string> existingTexts, decimal threshold = 0.65m)
+        {
+            try
+            {
+                var requestUri = $"{_aiServiceUrl}/ai/detect-duplicates";
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(20));
+                var payload = new
+                {
+                    new_text = newText,
+                    existing_texts = existingTexts,
+                    threshold = threshold
+                };
+                var response = await _httpClient.PostAsJsonAsync(requestUri, payload, cts.Token);
+                if (response.IsSuccessStatusCode)
+                {
+                    var result = await response.Content.ReadFromJsonAsync<DuplicateCheckResponse>();
+                    return result?.Matches ?? new List<DuplicateMatchDto>();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("AI duplicate detection failed: {Message}", ex.Message);
+            }
+            return new List<DuplicateMatchDto>();
+        }
+
+        public async Task<RegionalInsightsResponse?> GetRegionalInsightsAsync(List<ComplaintTrendInputDto> complaints)
+        {
+            try
+            {
+                var requestUri = $"{_aiServiceUrl}/ai/regional-insights";
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(20));
+                var payload = new
+                {
+                    complaints = complaints.Select(c => new {
+                        id = c.Id,
+                        region = c.Region,
+                        category = c.Category,
+                        created_at = c.CreatedAt
+                    })
+                };
+                var response = await _httpClient.PostAsJsonAsync(requestUri, payload, cts.Token);
+                if (response.IsSuccessStatusCode)
+                {
+                    return await response.Content.ReadFromJsonAsync<RegionalInsightsResponse>();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("AI regional insights failed: {Message}", ex.Message);
+            }
+            return null;
+        }
+
+        public async Task<string> GetAssistantReplyAsync(string message, List<ProjectContextDto> projects, List<ComplaintContextDto> complaints)
+        {
+            try
+            {
+                var requestUri = $"{_aiServiceUrl}/ai/assistant/chat";
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(20));
+                var payload = new
+                {
+                    message = message,
+                    projects_context = projects,
+                    complaints_context = complaints
+                };
+                var response = await _httpClient.PostAsJsonAsync(requestUri, payload, cts.Token);
+                if (response.IsSuccessStatusCode)
+                {
+                    var res = await response.Content.ReadFromJsonAsync<AssistantReplyResponse>();
+                    return res?.Reply ?? "I'm sorry, I encountered an error retrieving that information.";
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("AI assistant call failed: {Message}", ex.Message);
+            }
+            return "The AI assistant service is currently offline. Please try again later.";
+        }
+
+        public async Task<JsonElement?> ClusterSimilarAsync(IEnumerable<object> items, decimal threshold = 0.70m)
+        {
+            try
+            {
+                var requestUri = $"{_aiServiceUrl}/ai/cluster-similar";
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
+                var response = await _httpClient.PostAsJsonAsync(requestUri, new { items, threshold }, cts.Token);
+                if (response.IsSuccessStatusCode)
+                {
+                    using var stream = await response.Content.ReadAsStreamAsync();
+                    using var doc = await JsonDocument.ParseAsync(stream);
+                    return doc.RootElement.Clone();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("AI clustering failed: {Message}", ex.Message);
+            }
+            return null;
+        }
+
+        public async Task<JsonElement?> EvaluateClassifierAsync()
+        {
+            try
+            {
+                var requestUri = $"{_aiServiceUrl}/ai/evaluate";
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(60));
+                var response = await _httpClient.GetAsync(requestUri, cts.Token);
+                if (response.IsSuccessStatusCode)
+                {
+                    using var stream = await response.Content.ReadAsStreamAsync();
+                    using var doc = await JsonDocument.ParseAsync(stream);
+                    return doc.RootElement.Clone();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("AI evaluation failed: {Message}", ex.Message);
+            }
+            return null;
         }
 
         private AiClassifyResponse FallbackHeuristic(string text)

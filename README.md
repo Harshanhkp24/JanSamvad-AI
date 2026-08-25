@@ -27,8 +27,9 @@
  │   │   └── src/services/       # Axios API client with automatic JWT token attachment
  │   │
  │   └── JanSamvadAI.AI/         # FastAPI Python Microservice (AI & NLP)
- │       ├── main.py             # Rule-based NLP classifier, Duplicate Detector, Civic Assistant
- │       └── requirements.txt    # Python dependencies
+ │       ├── main.py             # Classification, duplicates, clustering, insights, grounded assistant
+ │       ├── evaluation_dataset.json  # Independent labeled set for AI quality checks (SRS NFR)
+ │       └── requirements.txt    # FastAPI, sentence-transformers, scikit-learn
  │
  └── Database/
      └── JanSamvadAI.sql         # Idempotent database schema deployment script
@@ -37,7 +38,7 @@
 ### Technology Highlights
 - **Backend**: ASP.NET Core 8, Entity Framework Core 8, ASP.NET Core Identity, JWT Bearer Auth, Swagger / OpenAPI.
 - **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Recharts (Data Visualizations), Lucide React (Icons), React-Leaflet.
-- **AI Microservice**: Python 3.10+, FastAPI, Uvicorn, Heuristic NLP & Semantic Categorization.
+- **AI Microservice**: Python 3.10+, FastAPI, Uvicorn, Sentence-Transformers (`all-MiniLM-L6-v2`) with TF-IDF / heuristic fallbacks. Implements SRS §18 classification, duplicate detection, similar-issue grouping, regional insights, and a grounded civic assistant.
 - **Database**: Microsoft SQL Server (LocalDB / SQL Express / Azure SQL).
 
 ---
@@ -97,6 +98,25 @@ uvicorn main:app --reload --port 8001
 
 ---
 
+## 🧠 AI Civic Intelligence (SRS §18)
+
+The FastAPI service at `src/JanSamvadAI.AI` is the AI layer specified in the requirement analysis. Recommendations are stored on the complaint (`AiClassification`, `ComplaintRelationship`) and **must not auto-delete** duplicates — officers verify them.
+
+| SRS item | Capability | Endpoint |
+| :--- | :--- | :--- |
+| **18.1 Must have** | Classify complaint text → category, department, priority (English + Hindi keywords + semantic embeddings) | `POST /ai/classify` |
+| **18.2 Should have** | Embedding similarity search for potential duplicates (review only, never auto-delete) | `POST /ai/detect-duplicates` |
+| **US-12 grouping** | Cluster similar complaints so repeated reports can be reviewed together | `POST /ai/cluster-similar` |
+| **18.3 Should have** | Region + category + time trend analysis and a short regional summary | `POST /ai/regional-insights` |
+| **18.4 Could have** | Civic assistant that answers only from verified project/complaint records (does not invent facts) | `POST /ai/assistant/chat` |
+| **NFR AI quality** | Accuracy check against an independent labeled dataset | `GET /ai/evaluate` |
+
+Health: `GET http://localhost:8001/ai/health`
+
+The ASP.NET Core API proxies these capabilities when filing grievances, listing regional insights, chatting with the assistant, clustering open complaints (`POST /api/complaints/cluster-similar`), and running evaluation (`GET /api/complaints/ai-evaluate`).
+
+---
+
 ## 👥 Demo Accounts (Development & Testing)
 
 You can log in to the application using any of the following pre-seeded test accounts (Password for all: `P@ssword1!`):
@@ -139,6 +159,11 @@ You can log in to the application using any of the following pre-seeded test acc
 - `POST /api/complaints/{id}/feedback` — Submit citizen satisfaction rating (1–5) and review.
 - `GET /api/complaints/categories` — List of grievance categories.
 - `GET /api/complaints/stats` — High-level grievance metrics for analytics dashboard.
+- `GET /api/complaints/duplicates` — Unverified potential-duplicate pairs for officer review.
+- `GET /api/complaints/regional-insights` — AI regional trend insights (ward + category + time).
+- `POST /api/complaints/assistant/chat` — Grounded civic assistant (verified platform data only).
+- `POST /api/complaints/cluster-similar` — Group similar open grievances for review.
+- `GET /api/complaints/ai-evaluate` — Run the independent classification evaluation set.
 
 ### 📍 Regions & Departments (`/api/regions`, `/api/departments`)
 - `GET /api/regions/districts` — List of administrative districts.
@@ -168,6 +193,11 @@ Run the following commands in PowerShell to verify your setup:
 4. **Verify Complaints Stats**:
    ```powershell
    Invoke-RestMethod -Method Get -Uri 'http://localhost:5000/api/complaints/stats' | ConvertTo-Json -Depth 5
+   ```
+5. **Verify AI NLP Service**:
+   ```powershell
+   Invoke-RestMethod -Method Get -Uri 'http://localhost:8001/ai/health' | ConvertTo-Json -Depth 5
+   Invoke-RestMethod -Method Get -Uri 'http://localhost:8001/ai/evaluate' | ConvertTo-Json -Depth 5
    ```
 
 ---

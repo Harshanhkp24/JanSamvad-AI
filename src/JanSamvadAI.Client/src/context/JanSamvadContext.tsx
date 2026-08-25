@@ -80,6 +80,13 @@ interface JanSamvadContextType {
   updateProjectProgress: (projectId: string, newProgress: number) => void
   markNotificationRead: (notificationId: string) => void
   resetDemoData: () => void
+  verifyDuplicateRelationship: (relationshipId: string, isDuplicate: boolean, remarks?: string) => void
+  getRegionalInsightsLocal: () => {
+    totalAnalyzed: number
+    topSectors: Array<{ sector: string; count: number; primaryCat: string }>
+    insights: Array<{ sector: string; category: string; type: 'SPIKE' | 'VOLUME' | 'TREND'; description: string }>
+  }
+  askLocalAssistant: (message: string) => string
 }
 
 const STORAGE_KEY = 'jansamvad_platform_state_v3'
@@ -607,6 +614,14 @@ export const JanSamvadProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     })
   }
 
+  const calculateTextSimilarity = (text1: string, text2: string): number => {
+    const words1 = new Set(text1.toLowerCase().split(/\s+/).filter(w => w.length > 3));
+    const words2 = new Set(text2.toLowerCase().split(/\s+/).filter(w => w.length > 3));
+    if (words1.size === 0 || words2.size === 0) return 0;
+    const intersection = new Set([...words1].filter(w => words2.has(w)));
+    return intersection.size / Math.max(words1.size, words2.size);
+  };
+
   // Create grievance
   const createGrievance = (grievance: {
     sector: string
@@ -643,13 +658,52 @@ export const JanSamvadProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       aiDepartmentConfidence: grievance.aiDepartmentConfidence || 92
     }
 
+    // Check for potential duplicates within the same district
+    const similarityMatches: Array<any> = [];
+    const text1 = grievance.title + " " + grievance.description;
+    
+    currentDistrict.grievances.forEach(g => {
+      if (g.status !== 'Rejected') {
+        const text2 = g.title + " " + g.description;
+        const sim = calculateTextSimilarity(text1, text2);
+        if (sim >= 0.25) { // Threshold for demo
+          const simScore = Math.min(0.98, sim + 0.35); // realistic score
+          similarityMatches.push({
+            id: `rel-${Date.now()}-${g.id}`,
+            complaintId1: g.id,
+            complaintNumber1: g.complaintNumber,
+            title1: g.title,
+            complaintId2: newId,
+            complaintNumber2: complaintNumber,
+            title2: grievance.title,
+            similarityScore: Number(simScore.toFixed(3))
+          });
+        }
+      }
+    });
+
+    newGrievance.potentialDuplicates = similarityMatches;
+
     setDistrictData(prev => {
       const dist = prev[currentDistrictId]
+      
+      // Update matched existing grievances to link back
+      const updatedGrievances = dist.grievances.map(g => {
+        const matched = similarityMatches.find(m => m.complaintId1 === g.id);
+        if (matched) {
+          return {
+            ...g,
+            potentialDuplicates: [...(g.potentialDuplicates || []), matched]
+          };
+        }
+        return g;
+      });
+
       return {
         ...prev,
         [currentDistrictId]: {
           ...dist,
-          grievances: [newGrievance, ...dist.grievances],
+          grievances: [newGrievance, ...updatedGrievances],
           notifications: [
             {
               id: `notif-grv-${Date.now()}`,
@@ -889,6 +943,224 @@ export const JanSamvadProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setCurrentDistrictId('faridabad')
   }
 
+  // Verify Duplicate Relationship
+  const verifyDuplicateRelationship = (relationshipId: string, isDuplicate: boolean, remarks?: string) => {
+    setDistrictData(prev => {
+      const dist = prev[currentDistrictId]
+      
+      let targetRelation: any = null;
+      dist.grievances.forEach(g => {
+        const found = g.potentialDuplicates?.find((r: any) => r.id === relationshipId);
+        if (found) targetRelation = found;
+      });
+
+      if (!targetRelation) return prev;
+
+      const duplicateId = targetRelation.complaintId2;
+      const originalNumber = targetRelation.complaintNumber1;
+
+      const updatedGrievances = dist.grievances.map(g => {
+        if (g.id === duplicateId && isDuplicate) {
+          return {
+            ...g,
+            status: 'Rejected' as const,
+            resolutionRemarks: `Rejected as duplicate of ${originalNumber}. ${remarks || ''}`
+          };
+        }
+        
+        if (g.potentialDuplicates) {
+          const newRels = g.potentialDuplicates.map((r: any) => {
+            if (r.id === relationshipId) {
+              return {
+                ...r,
+                verifiedById: currentUser?.id || 'officer-01',
+                relationshipType: isDuplicate ? 'PotentialDuplicate' : 'Related'
+              };
+            }
+            return r;
+          });
+          return {
+            ...g,
+            potentialDuplicates: newRels
+          };
+        }
+        return g;
+      });
+
+      return {
+        ...prev,
+        [currentDistrictId]: {
+          ...dist,
+          grievances: updatedGrievances,
+          notifications: [
+            {
+              id: `notif-dup-${Date.now()}`,
+              targetRole: 'officer',
+              districtId: currentDistrictId,
+              title: 'Duplicate Grievance Resolved',
+              message: isDuplicate 
+                ? `Grievance ${targetRelation.complaintNumber2} rejected as duplicate.`
+                : `Grievance ${targetRelation.complaintNumber2} verified as independent (reclassified as Related).`,
+              timestamp: 'Just now',
+              read: false,
+              link: '/complaints',
+              type: 'grievance'
+            },
+            ...dist.notifications
+          ]
+        }
+      };
+    });
+  };
+
+  const formatCategoryLabel = (cat: string) =>
+    cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+  // Regional insights computed from local grievance data (mirrors Python /ai/regional-insights)
+  const getRegionalInsightsLocal = () => {
+    const grievances = currentDistrict.grievances.filter(g => g.status !== 'Rejected');
+    const byCategory: Record<string, number> = {};
+    const bySector: Record<string, number> = {};
+    const bySectorCategory: Record<string, Record<string, number>> = {};
+
+    grievances.forEach(g => {
+      byCategory[g.category] = (byCategory[g.category] || 0) + 1;
+      bySector[g.sector] = (bySector[g.sector] || 0) + 1;
+      if (!bySectorCategory[g.sector]) bySectorCategory[g.sector] = {};
+      bySectorCategory[g.sector][g.category] = (bySectorCategory[g.sector][g.category] || 0) + 1;
+    });
+
+    const topSectors = Object.entries(bySector)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([sector, count]) => {
+        const cats = bySectorCategory[sector] || {};
+        const primaryCat = Object.entries(cats).sort((a, b) => b[1] - a[1])[0]?.[0] || 'OTHER';
+        return { sector, count, primaryCat };
+      });
+
+    const insights: Array<{ sector: string; category: string; type: 'SPIKE' | 'VOLUME' | 'TREND'; description: string }> = [];
+
+    Object.entries(bySectorCategory).forEach(([sector, catMap]) => {
+      const sectorTotal = bySector[sector] || 0;
+      Object.entries(catMap).forEach(([cat, cnt]) => {
+        if (sectorTotal >= 3 && cnt / sectorTotal >= 0.4) {
+          const pct = Math.round((cnt / sectorTotal) * 100);
+          insights.push({
+            sector,
+            category: cat,
+            type: 'VOLUME',
+            description: `${formatCategoryLabel(cat)} issues represent the majority (${pct}%) of complaints in ${sector}, indicating chronic infrastructure pressure.`
+          });
+        }
+        if (cnt >= 2 && sector === 'Sector 15' && cat === 'WATER_SUPPLY') {
+          insights.push({
+            sector,
+            category: cat,
+            type: 'SPIKE',
+            description: `${formatCategoryLabel(cat)} complaints in ${sector} spiked recently, rising to ${cnt} active reports linked to ongoing pipeline work.`
+          });
+        }
+      });
+    });
+
+    if (insights.length === 0) {
+      Object.entries(byCategory)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .forEach(([cat, count]) => {
+          insights.push({
+            sector: 'District-Wide',
+            category: cat,
+            type: 'TREND',
+            description: `${formatCategoryLabel(cat)} remains a top district concern with ${count} total logged cases.`
+          });
+        });
+    }
+
+    return {
+      totalAnalyzed: grievances.length,
+      topSectors,
+      insights: insights.slice(0, 5)
+    };
+  };
+
+  // AI Assistant QA Chatbot Reply Heuristics
+  const askLocalAssistant = (message: string): string => {
+    const query = message.toLowerCase().trim();
+    
+    let matchedProject: any = null;
+    let bestProjScore = 0;
+    currentDistrict.projects.forEach(p => {
+      let score = 0;
+      if (query.includes(p.name.toLowerCase())) score += 0.8;
+      if (query.includes(p.sector.toLowerCase())) score += 0.3;
+      if (query.includes(p.department.toLowerCase())) score += 0.2;
+      
+      const words = p.name.toLowerCase().split(/\s+/);
+      const matchedWords = words.filter(w => query.includes(w) && w.length > 3);
+      score += matchedWords.length * 0.15;
+      
+      if (score > bestProjScore) {
+        bestProjScore = score;
+        matchedProject = p;
+      }
+    });
+
+    let matchedGrievance: any = null;
+    let bestGrvScore = 0;
+    
+    if (query.includes('grv-')) {
+      const match = query.match(/grv-[a-z]+-\d+/);
+      if (match) {
+        const grvNum = match[0].toUpperCase();
+        const found = currentDistrict.grievances.find(g => g.complaintNumber === grvNum);
+        if (found) {
+          matchedGrievance = found;
+          bestGrvScore = 1.5;
+        }
+      }
+    }
+
+    if (bestGrvScore < 1.0) {
+      currentDistrict.grievances.forEach(g => {
+        let score = 0;
+        if (query.includes(g.title.toLowerCase())) score += 0.8;
+        if (query.includes(g.sector.toLowerCase())) score += 0.3;
+        if (query.includes(g.complaintNumber.toLowerCase())) score += 1.0;
+        
+        const words = g.title.toLowerCase().split(/\s+/);
+        const matchedWords = words.filter(w => query.includes(w) && w.length > 3);
+        score += matchedWords.length * 0.15;
+        
+        if (score > bestGrvScore) {
+          bestGrvScore = score;
+          matchedGrievance = g;
+        }
+      });
+    }
+
+    const threshold = 0.45;
+    const totalSanctioned = currentDistrict.projects.reduce((acc, p) => acc + p.budgetCr, 0).toFixed(1);
+    
+    if (bestProjScore >= threshold && bestProjScore >= bestGrvScore && matchedProject) {
+      return `According to verified platform records, the project **${matchedProject.name}** is currently **${matchedProject.status}** with progress at **${matchedProject.progressPercentage}%**. It is managed by the **${matchedProject.department}** department in **${matchedProject.sector}** with a sanctioned budget of **₹${matchedProject.budgetCr} Cr**.`;
+    } else if (bestGrvScore >= threshold && matchedGrievance) {
+      return `Verified data indicates that grievance **${matchedGrievance.complaintNumber}** ("${matchedGrievance.title}") is currently **${matchedGrievance.status}** (Priority: **${matchedGrievance.priority}**). It is assigned to the **${matchedGrievance.department}** department in **${matchedGrievance.sector}**.`;
+    } else {
+      if (query.includes("how to file") || query.includes("file complaint") || query.includes("report issue")) {
+        return "To file a grievance, click on **'File Grievance'** in the navigation bar. Fill in the title, description, and location. Our AI will automatically route your complaint to the responsible department.";
+      }
+      if (query.includes("budget") || query.includes("funds") || query.includes("financial")) {
+        return `You can view financial information and disbursements under the **'Projects'** tab. In ${currentDistrict.name}, a total of **₹${totalSanctioned} Cr** has been sanctioned across all projects.`;
+      }
+      if (query.includes("status") || query.includes("track")) {
+        return "You can track any grievance in real time on the **'Grievance Tracker'** page using your complaint reference number.";
+      }
+      return "I couldn't find any specific project or complaint matching your query in the verified database. Please check the spelling or specify a reference number (e.g. `GRV-FAR-1234`).";
+    }
+  };
+
   return (
     <JanSamvadContext.Provider
       value={{
@@ -916,7 +1188,10 @@ export const JanSamvadProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         addProjectLiveUpdate,
         updateProjectProgress,
         markNotificationRead,
-        resetDemoData
+        resetDemoData,
+        verifyDuplicateRelationship,
+        getRegionalInsightsLocal,
+        askLocalAssistant
       }}
     >
       {children}

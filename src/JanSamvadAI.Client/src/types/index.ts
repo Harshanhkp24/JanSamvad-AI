@@ -226,10 +226,21 @@ export interface GrievanceRecord {
   projectId?: string
   projectName?: string
   locationDetails: string
-  aiDepartmentConfidence: number
-  feedbackRating?: number // 1-5
-  feedbackComment?: string
-  resolutionRemarks?: string
+  aiDepartmentConfidence: number;
+  feedbackRating?: number;
+  feedbackComment?: string;
+  resolutionRemarks?: string;
+  potentialDuplicates?: Array<{
+    id: string;
+    complaintId1: string;
+    complaintNumber1: string;
+    title1: string;
+    complaintId2: string;
+    complaintNumber2: string;
+    title2: string;
+    similarityScore: number;
+    verifiedById?: string;
+  }>;
 }
 
 export type QuestionStatus = 'Pending Response' | 'Under Review' | 'Answered' | 'Clarification Requested' | 'Closed'
