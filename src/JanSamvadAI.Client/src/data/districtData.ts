@@ -575,7 +575,7 @@ export const INITIAL_DATA: Record<DistrictId, DistrictDataSet> = {
           department: 'Water Supply Department',
           status: 'Ongoing'
         },
-        imageUrl: 'https://images.unsplash.com/photo-1541888946425-d0fbb180c5f5?w=800&auto=format&fit=crop&q=80',
+        imageUrl: 'https://imgs.search.brave.com/0rzGKSFEISteheb8Gi2moHVvfpwvXy5QH3Y_KpjRtMg/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9tZWRp/YS5pc3RvY2twaG90/by5jb20vaWQvMTI4/ODk3MTgzMy9waG90/by93YXRlci1waXBl/bGluZS1tYWludGVu/YW5jZS5qcGc_cz02/MTJ4NjEyJnc9MCZr/PTIwJmM9SjBmbG1Q/NTVoZFVsU3Nzc0NP/UzJiSXNQV3ptZ0F2/NjhDOEZuUVNwWEpY/bz0',
         likes: 245,
         supportsCount: 245,
         commentsCount: 38,
