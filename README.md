@@ -84,7 +84,7 @@ cd src/JanSamvadAI.Client
 npm install
 npm run dev
 ```
-👉 Web App: **`http://localhost:5173`**
+Web App: **`http://localhost:5173`**
 
 ##### 3. Optional: AI NLP Service (FastAPI Python)
 ```powershell
